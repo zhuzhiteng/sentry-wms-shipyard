@@ -54,7 +54,7 @@
         class="button-primary"
         data-id="{{item.ticket_id}}"
         bindtap="startTicket"
-        disabled="{{!item.can_receive || submitUncertain}}"
+        disabled="{{!item.can_receive || submitUncertain || busy}}"
       >
         {{item.status === 'PARTIAL' ? '继续补收货' : '开始收货'}}
       </button>

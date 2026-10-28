@@ -451,6 +451,57 @@ test('starting a new receipt clears a stale successful submission key', () => {
   );
 });
 
+test('receiving cannot switch tickets while a submission is in flight', () => {
+  const session = {
+    user: { username: 'receiver' },
+    warehouseId: 1,
+  };
+  installMock('utils/session.js', {
+    requireSession: () => session,
+  });
+  installMock('utils/request.js', {
+    request: async () => ({}),
+    upload: async () => ({}),
+  });
+  const toasts = [];
+  global.wx = {
+    showToast: (options) => toasts.push(options.title),
+    pageScrollTo: () => {},
+  };
+  installMemoryStorage(global.wx);
+
+  const page = instantiate(loadPage('pages/receive/index.js'));
+  page.data.session = session;
+  page.draftScope = 'receipt:receiver:1';
+  page.data.busy = true;
+  page.data.selectedManifest = {
+    tickets: [{
+      ticket_id: 'ticket-1',
+      status: 'EXPECTED',
+      declared_quantity: '4.000',
+      received_quantity: '0.000',
+      expected_pallet_count: 2,
+      pallet_count: 0,
+    }],
+  };
+  const workflow = require('../utils/workflow');
+  workflow.getOrCreateSubmissionKey(
+    'receipt-submit:receiver:ticket-1',
+    'receipt',
+  );
+
+  page.startTicket({
+    currentTarget: { dataset: { id: 'ticket-1' } },
+  });
+
+  assert.equal(page.data.selectedTicket, null);
+  assert.match(toasts.at(-1), /正在提交/);
+  assert.equal(
+    workflow.hasSubmissionKey('receipt-submit:receiver:ticket-1'),
+    true,
+  );
+});
+
 test('outbound restores photographed pallets before confirmation', async () => {
   const session = {
     user: { username: 'outbound' },

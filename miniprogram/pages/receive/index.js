@@ -216,6 +216,10 @@ Page({
   },
 
   startTicket(event) {
+    if (this.data.busy || this.submissionPending) {
+      wx.showToast({ title: '正在提交，请等待结果', icon: 'none' });
+      return;
+    }
     if (this.data.submitUncertain) {
       wx.showToast({ title: '上次提交结果未确认，请先重试', icon: 'none' });
       return;
