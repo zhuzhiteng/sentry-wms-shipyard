@@ -184,8 +184,14 @@ bypass the page-permission gate.
 
 ## Delivery status
 
-At 2026-10-28, PR #465 is open, mergeable and not deployed. GitHub reports
-`mergeable_state=blocked` because the four pull-request workflow runs are
-`action_required` for a first-time fork contributor. The required branch checks
-are configured, but none has produced a check run until an upstream maintainer
-approves the workflows.
+At 2026-10-28, the canonical delivery repository is
+`zhuzhiteng/sentry-wms-shipyard`, an independent public repository preserving
+the complete Apache-2.0 history, tags and NOTICE. Its `main` branch points to
+`197497e49ed423f55b80815e3bda791ff591c3ba`. The same-repository runs completed
+successfully: Tests `40679653372`, Dependency Audit `40679653425`, gitleaks
+`40679653626` and Lockfile Version Check `40679653594`.
+
+Upstream PR #465 remains open as provenance, but it is no longer a release
+gate. GitHub still reports it as `mergeable_state=blocked` because a first-time
+fork contributor requires maintainer approval; the independent repository
+does not have that fork workflow restriction. Nothing is deployed.

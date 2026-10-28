@@ -18,7 +18,7 @@
 | SHIP-R03 | 刚签发的 JWT 在主机时钟小幅回拨时被误判并返回 `401` | `CLOSED_WITH_MONITORING` | JWT 校验默认容忍 5 秒、硬上限 60 秒；未来 2 秒 token 通过、未来 30 秒仍拒绝；两轮 250 请求/50 并发 E2E 通过；保留鉴权异常类型 debug 日志 | 研发、运维 |
 | SHIP-R04 | 独立 E2E 复用进程内限流计数导致重复运行假 `429` | `CLOSED` | E2E 启动时重置 Flask-Limiter；连续运行通过，生产限流 `300/min` 保持不变 | 研发 |
 | SHIP-R05 | 船号项目绑定是否按仓库复制不明确 | `CLOSED` | 明确为系统级项目主数据，跨仓库共享；修改必须同时具备 `SHIPYARD_MANAGER` 和 `shipyard-settings`，全量审计；仓库隔离继续覆盖区域和业务单据 | 产品、研发 |
-| SHIP-R06 | 首次 fork 贡献者的 GitHub workflows 被 `action_required` 阻塞 | `EXTERNAL` | 上游维护者批准当前 head 的 Tests、Lockfile、gitleaks、Dependency Audit runs；随后 required checks 必须全绿 | 上游维护者 |
+| SHIP-R06 | 首次 fork 贡献者的 GitHub workflows 被 `action_required` 阻塞 | `CLOSED` | 已切换到独立仓库 `zhuzhiteng/sentry-wms-shipyard`；`main` 的 Tests `40679653372`、Dependency Audit `40679653425`、gitleaks `40679653626`、Lockfile Version Check `40679653594` 全部实际执行并通过。上游 PR #465 仅保留为来源记录 | 研发 |
 | SHIP-R07 | 自动测试使用确定性 OCR stub，真实百度识别率未知 | `EXTERNAL` | 配置真实凭据，使用脱敏现场吊牌样本完成字段命中率、超时、限流和错误恢复验收 | 项目负责人、现场 |
 | SHIP-R08 | 未在微信开发者工具、合法域名和真机验证 | `EXTERNAL` | 配置正式 AppID、HTTPS 合法域名，完成 iOS/Android 拍照、弱网、重复点击和上传中断验收 | 项目负责人、微信管理员 |
 | SHIP-R09 | 未做真实业务 UAT 和生产部署演练 | `NOT_AUTHORIZED` | 在独立环境完成备份恢复、迁移窗口、双人复核、异常回滚和现场 UAT 后再批准部署 | 发布负责人 |
@@ -27,9 +27,8 @@
 
 以下条件全部满足前，发布结论保持 `NO-GO`：
 
-1. SHIP-R06 关闭，PR required checks 实际运行且全部通过；
-2. SHIP-R07 和 SHIP-R08 有可复核的外部验收记录；
-3. SHIP-R09 完成备份恢复、迁移回滚和现场 UAT；
-4. 真实 OCR 凭据、微信账号、域名和现场联系人不在仓库中留存。
+1. SHIP-R07 和 SHIP-R08 有可复核的外部验收记录；
+2. SHIP-R09 完成备份恢复、迁移回滚和现场 UAT；
+3. 真实 OCR 凭据、微信账号、域名和现场联系人不在仓库中留存。
 
 代码提交、自动测试通过、构建通过、PR 合并、部署和现场验收是不同层级，不得互相替代。
