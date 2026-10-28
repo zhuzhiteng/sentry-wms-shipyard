@@ -186,8 +186,9 @@ bypass the page-permission gate.
 
 At 2026-10-28, the canonical delivery repository is
 `zhuzhiteng/sentry-wms-shipyard`, an independent public repository preserving
-the complete Apache-2.0 history, tags and NOTICE. Its `main` branch points to
-`197497e49ed423f55b80815e3bda791ff591c3ba`. The same-repository runs completed
+the complete Apache-2.0 history, tags and NOTICE. The validated source commit is
+`197497e49ed423f55b80815e3bda791ff591c3ba`; a later documentation-only commit
+records the same evidence on `main`. The same-repository runs completed
 successfully: Tests `40679653372`, Dependency Audit `40679653425`, gitleaks
 `40679653626` and Lockfile Version Check `40679653594`.
 
