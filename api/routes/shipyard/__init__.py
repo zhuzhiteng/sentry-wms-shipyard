@@ -77,6 +77,5 @@ from routes.shipyard import (  # noqa: F401
     config,
     formal_outbound,
     inbound,
-    outbound,
     receipts,
 )

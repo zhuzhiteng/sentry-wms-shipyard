@@ -17,6 +17,18 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_CORS_ORIGINS = (
+    "http://localhost:3000",
+    "http://localhost:5000",
+)
+
+
+def resolve_cors_origins(value=None):
+    raw = os.getenv("CORS_ORIGINS") if value is None else value
+    if not raw:
+        raw = ",".join(DEFAULT_CORS_ORIGINS)
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
 
 def check_build_version(build_file_path="/app/BUILD_VERSION"):
     """v1.4.2 #73: detect upgrade-without-rebuild.
@@ -331,18 +343,14 @@ def create_app():
     app.config["MAPPING_REGISTRY"] = _mapping_boot_load(database_url, mappings_dir)
 
     # CORS - restrict to known origins, configurable via env var
-    cors_origins = os.getenv(
-        "CORS_ORIGINS",
-        "http://localhost:3000,http://localhost:5000,http://localhost:8081",
-    ).split(",")
-    resolved_origins = [o.strip() for o in cors_origins]
+    resolved_origins = resolve_cors_origins()
     # V-045: credentials must cross CORS for the admin SPA's HttpOnly cookie.
     # Origins stay restricted (no wildcard), which is required for cookie auth.
     CORS(app, origins=resolved_origins, supports_credentials=True)
 
     # V-041: rate limiting. Default 300/min per authenticated user (or per IP
     # if unauthenticated); sensitive routes override via @limiter.limit(...).
-    from services.rate_limit import init_limiter, _resolve_storage_uri
+    from services.rate_limit import init_limiter
     init_limiter(app)
 
     # v1.5.1 V-205 (#146): wire up Redis pubsub for cross-worker
@@ -445,24 +453,24 @@ def create_app():
         return {"error": "Internal server error"}, 500
 
     # Register blueprints
-    from routes.auth import auth_bp
-    from routes.lookup import lookup_bp
-    from routes.receiving import receiving_bp
-    from routes.putaway import putaway_bp
-    from routes.picking import picking_bp
-    from routes.packing import packing_bp
-    from routes.shipping import shipping_bp
-    from routes.inventory import inventory_bp
-    from routes.transfers import transfers_bp
     from routes.admin import admin_bp
-    from routes.warehouses import warehouses_bp
-    from routes.polling import polling_bp
-    from routes.snapshot import snapshot_bp
-    from routes.inbound import inbound_bp
+    from routes.auth import auth_bp
     from routes.dashboard import dashboard_bp
     from routes.dockd import dockd_bp
+    from routes.inbound import inbound_bp
+    from routes.inventory import inventory_bp
+    from routes.lookup import lookup_bp
+    from routes.packing import packing_bp
+    from routes.picking import picking_bp
+    from routes.polling import polling_bp
     from routes.pos import pos_bp
+    from routes.putaway import putaway_bp
+    from routes.receiving import receiving_bp
+    from routes.shipping import shipping_bp
     from routes.shipyard import shipyard_bp
+    from routes.snapshot import snapshot_bp
+    from routes.transfers import transfers_bp
+    from routes.warehouses import warehouses_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(lookup_bp, url_prefix="/api/lookup")
@@ -527,9 +535,10 @@ def create_app():
     # to admin_bp after registration does not propagate to the
     # app's URL map. Auth is enforced via the standard decorators
     # so the wiring matches every other admin-only endpoint.
+    from flask import jsonify as _jsonify
+
     from middleware.auth_middleware import require_auth as _require_auth
     from middleware.auth_middleware import require_role as _require_role
-    from flask import jsonify as _jsonify
 
     @app.route("/api/admin/system-info", methods=["GET"])
     @_require_auth
@@ -580,5 +589,5 @@ def create_app():
 
 if __name__ == "__main__":
     app = create_app()
-    port = int(os.getenv("FLASK_PORT", 5000))
+    port = int(os.getenv("FLASK_PORT", "5000"))
     app.run(host="0.0.0.0", port=port, debug=False)

@@ -95,39 +95,6 @@ class ShortageStateError(ShipyardStateError):
     code = "shortage_state_conflict"
 
 
-class DistributionImportNotFoundError(ShipyardNotFoundError):
-    code = "distribution_import_not_found"
-
-
-class DistributionImportStateError(ShipyardStateError):
-    code = "distribution_import_state_conflict"
-
-
-class DuplicateDistributionFileError(ShipyardConflictError):
-    code = "duplicate_distribution_file"
-
-
-class DispatchNotFoundError(ShipyardNotFoundError):
-    code = "dispatch_not_found"
-
-
-class DispatchStateError(ShipyardStateError):
-    code = "dispatch_state_conflict"
-
-
-class DeliveryNoteNotFoundError(ShipyardNotFoundError):
-    code = "delivery_note_not_found"
-
-
-class DeliveryNoteStateError(ShipyardStateError):
-    code = "delivery_note_state_conflict"
-
-
-class DispatchMatchError(ShipyardValidationError):
-    code = "dispatch_match_failed"
-    status_code = 422
-
-
 class OutboundManifestNotFoundError(ShipyardNotFoundError):
     code = "outbound_manifest_not_found"
 

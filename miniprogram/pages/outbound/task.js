@@ -4,7 +4,7 @@ const { request, upload } = require('../../utils/request');
 const {
   chooseNextSuffix,
   normalizeSuffix,
-} = require('../../utils/scan');
+} = require('../../utils/pallet');
 const { requireSession } = require('../../utils/session');
 
 Page({

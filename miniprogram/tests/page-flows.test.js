@@ -149,7 +149,6 @@ test('receiving submits a short quantity with fewer pallets and its reason', asy
   assert.equal(requests[0].data.received_quantity, 2);
   assert.equal(requests[0].data.pallets.length, 1);
   assert.equal(requests[0].data.pallets[0].label_recognition_id, 'recognition-1');
-  assert.equal(requests[0].data.pallets[0].qr_payload, undefined);
   assert.equal(requests[0].data.difference_reason, '少 2 件，余货明天补到');
 });
 

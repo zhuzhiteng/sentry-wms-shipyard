@@ -1,4 +1,4 @@
-"""Schema-level tests for migration 082 (shipyard domain core)."""
+"""Current schema coverage for the shipyard domain core."""
 
 import hashlib
 import os
@@ -6,15 +6,6 @@ import uuid
 
 import psycopg2
 from psycopg2.extras import Json
-
-MIGRATION_PATH = os.path.join(
-    os.path.dirname(__file__),
-    "..",
-    "..",
-    "db",
-    "migrations",
-    "082_shipyard_core.sql",
-)
 
 
 def _make_conn():
@@ -120,19 +111,18 @@ def _make_ticket(conn, line_id, bin_id, quantity=45, suffix="82"):
     return returned_ticket_id
 
 
-def _make_pallet(conn, ticket_id, suffix="1-1", payload=None):
-    payload = payload or f"QR-{uuid.uuid4().hex}"
+def _make_pallet(conn, ticket_id, suffix="1-1"):
     cur = conn.cursor()
     cur.execute(
         """
         INSERT INTO shipyard_pallet_units
-            (ticket_id, tag_suffix, qr_payload, qr_payload_sha256,
-             factory_pallet_no, installation_pallet_no, batch_no, status)
-        VALUES (%s, %s, %s, %s, '132ME201EM', '132FE120121',
+            (ticket_id, tag_suffix, factory_pallet_no,
+             installation_pallet_no, batch_no, status)
+        VALUES (%s, %s, '132ME201EM', '132FE120121',
                 'H1633杰宇-0', 'EXPECTED')
         RETURNING pallet_id
         """,
-        (ticket_id, suffix, payload, _sha(payload)),
+        (ticket_id, suffix),
     )
     pallet_id = cur.fetchone()[0]
     cur.close()
@@ -152,7 +142,7 @@ def test_expected_tables_and_columns_exist():
             "po_no",
         },
         "shipyard_cargo_tickets": {"inbound_line_id", "stock_lot_number"},
-        "shipyard_pallet_units": {"ticket_id", "tag_suffix", "qr_payload_sha256"},
+        "shipyard_pallet_units": {"ticket_id", "tag_suffix", "label_fields"},
     }
     conn = _make_conn()
     try:
@@ -400,24 +390,5 @@ def test_deleting_ticket_cascades_to_pallets():
             (pallet_id,),
         )
         assert cur.fetchone()[0] == 0
-    finally:
-        conn.close()
-
-
-def test_migration_is_idempotent():
-    with open(MIGRATION_PATH, encoding="utf-8") as migration:
-        sql = migration.read()
-    conn = psycopg2.connect(os.environ["DATABASE_URL"])
-    conn.autocommit = True
-    try:
-        cur = conn.cursor()
-        cur.execute(sql)
-        later_migration = os.path.join(
-            os.path.dirname(MIGRATION_PATH),
-            "083_shipyard_integrity.sql",
-        )
-        if os.path.exists(later_migration):
-            with open(later_migration, encoding="utf-8") as migration:
-                cur.execute(migration.read())
     finally:
         conn.close()

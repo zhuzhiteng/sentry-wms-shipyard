@@ -40,10 +40,9 @@ def require_packing_before_shipping(db) -> bool:
     return not row or row.value != "false"
 
 
-# Canonical carrier vocabulary, shared with the mobile ship screens' carrier
-# picker (mobile/src/screens/ShipScreen.js CARRIERS). Each entry maps a
-# lower-cased token to its canonical label; "usps" is listed before "ups" as
-# defensive ordering even though the two share no substring.
+# Canonical carrier vocabulary. Each entry maps a lower-cased token to its
+# canonical label; "usps" is listed before "ups" as defensive ordering even
+# though the two share no substring.
 _CARRIER_TOKENS = (
     ("usps", "USPS"),
     ("ups", "UPS"),

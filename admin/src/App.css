@@ -1217,59 +1217,6 @@ a {
   scroll-margin-top: 84px;
 }
 
-.shipyard-workspace-switch {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 18px;
-  padding: 5px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-}
-
-.shipyard-workspace-switch button {
-  display: flex;
-  min-height: 64px;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 3px;
-  padding: 10px 14px;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
-  color: var(--text-secondary);
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-}
-
-.shipyard-workspace-switch button:hover {
-  background: var(--white);
-}
-
-.shipyard-workspace-switch button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.shipyard-workspace-switch button.is-active {
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
-  color: var(--text);
-  background: var(--white);
-  box-shadow: 0 3px 12px rgb(30 41 59 / 8%);
-}
-
-.shipyard-workspace-switch strong {
-  font-size: 14px;
-}
-
-.shipyard-workspace-switch span {
-  color: var(--text-tertiary);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
 .shipyard-notice {
   display: flex;
   align-items: center;
@@ -1553,10 +1500,6 @@ a {
 }
 
 @media (max-width: 900px) {
-  .shipyard-workspace-switch {
-    grid-template-columns: 1fr;
-  }
-
   .shipyard-section-heading,
   .shipyard-note-builder,
   .shipyard-dropzone {

@@ -1,8 +1,8 @@
-site_name: Sentry WMS
-site_description: Open-source warehouse management system for e-commerce
-site_url: https://hightower-systems.github.io/sentry-wms
-repo_url: https://github.com/hightower-systems/sentry-wms
-repo_name: hightower-systems/sentry-wms
+site_name: 船厂仓储管理系统
+site_description: 船厂到货、库存、正式出库与装车追溯
+site_url: https://zhuzhiteng.github.io/sentry-wms-shipyard/
+repo_url: https://github.com/zhuzhiteng/sentry-wms-shipyard
+repo_name: zhuzhiteng/sentry-wms-shipyard
 
 theme:
   name: material
@@ -37,23 +37,16 @@ extra_css:
   - stylesheets/extra.css
 
 nav:
-  - Home: index.md
-  - API Reference: api-reference.md
-  - Deployment: deployment.md
-  - Admin Panel: admin-panel.md
-  - Connectors: connectors.md
-  - ERP Integration: erp-integration.md
-  - Transfer Orders: transfer-orders.md
+  - 首页: index.md
+  - 部署: deployment.md
   - 船厂仓储:
       - 基线与状态: shipyard/baseline.md
       - 入库清单: shipyard/inbound-api.md
-      - 扫码收货: shipyard/receipt-api.md
-      - 配送与发货单: shipyard/outbound-documents-api.md
+      - 拍照识别收货: shipyard/receipt-api.md
       - 正式出库与装车: shipyard/formal-outbound-api.md
       - 风险闭环台账: shipyard/risk-register.md
-  - Test Lab: test-lab.md
-  - Contributing: contributing.md
-  - Changelog: changelog.md
+  - 测试手册: test-lab.md
+  - 贡献指南: contributing.md
 
 markdown_extensions:
   - tables

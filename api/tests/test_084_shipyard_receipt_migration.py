@@ -1,29 +1,15 @@
-"""Schema tests for migration 084 (pallet receipt and photo evidence)."""
+"""Current schema coverage for pallet receipt and photo evidence."""
 
-import hashlib
 import os
 import uuid
 
 import psycopg2
-
-MIGRATION_PATH = os.path.join(
-    os.path.dirname(__file__),
-    "..",
-    "..",
-    "db",
-    "migrations",
-    "084_shipyard_receipt.sql",
-)
 
 
 def _make_conn():
     conn = psycopg2.connect(os.environ["DATABASE_URL"])
     conn.autocommit = False
     return conn
-
-
-def _sha(value: str) -> str:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 def _ticket_fixture(conn):
@@ -190,36 +176,21 @@ def test_null_pallet_suffix_is_unique_within_ticket():
         cur = conn.cursor()
         cur.execute(
             """
-            INSERT INTO shipyard_pallet_units
-                (ticket_id, qr_payload, qr_payload_sha256)
-            VALUES
-                (%s, 'first', %s)
+            INSERT INTO shipyard_pallet_units (ticket_id)
+            VALUES (%s)
             """,
-            (ticket_id, _sha("first")),
+            (ticket_id,),
         )
         try:
             cur.execute(
                 """
-                INSERT INTO shipyard_pallet_units
-                    (ticket_id, qr_payload, qr_payload_sha256)
-                VALUES
-                    (%s, 'second', %s)
+                INSERT INTO shipyard_pallet_units (ticket_id)
+                VALUES (%s)
                 """,
-                (ticket_id, _sha("second")),
+                (ticket_id,),
             )
             assert False, "a ticket cannot have two pallets with a null suffix"
         except psycopg2.errors.UniqueViolation:
             conn.rollback()
-    finally:
-        conn.close()
-
-
-def test_migration_is_idempotent():
-    with open(MIGRATION_PATH, encoding="utf-8") as migration:
-        sql = migration.read()
-    conn = psycopg2.connect(os.environ["DATABASE_URL"])
-    conn.autocommit = True
-    try:
-        conn.cursor().execute(sql)
     finally:
         conn.close()

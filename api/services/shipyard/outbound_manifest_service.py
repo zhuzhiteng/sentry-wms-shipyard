@@ -323,8 +323,8 @@ def _task_pallets(db, ticket_id: str):
     return db.execute(
         text(
             """
-            SELECT pallet_id, tag_suffix, qr_payload, qr_payload_sha256,
-                   factory_pallet_no, installation_pallet_no, batch_no, status
+            SELECT pallet_id, tag_suffix, factory_pallet_no,
+                   installation_pallet_no, batch_no, status
               FROM shipyard_pallet_units
              WHERE ticket_id = :ticket_id
              ORDER BY tag_suffix NULLS FIRST, pallet_id
@@ -383,7 +383,6 @@ def _candidate_from_row(db, row, line) -> dict[str, Any]:
             {
                 "pallet_id": str(pallet.pallet_id),
                 "tag_suffix": pallet.tag_suffix,
-                "qr_payload_sha256": pallet.qr_payload_sha256,
                 "factory_pallet_no": pallet.factory_pallet_no,
                 "installation_pallet_no": pallet.installation_pallet_no,
                 "batch_no": pallet.batch_no,

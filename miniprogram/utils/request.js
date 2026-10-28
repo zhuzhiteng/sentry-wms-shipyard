@@ -8,7 +8,6 @@ const FIELD_LABELS = {
   material_code: '物料编码',
   item_name: '品名',
   tag_suffix: '托盘后缀',
-  qr_payload: '二维码原文',
   ship_no: '船号',
   engineering_no: '工程号',
   production_drawing_no: '制作图号',

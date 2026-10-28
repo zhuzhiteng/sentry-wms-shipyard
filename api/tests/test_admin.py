@@ -1,7 +1,3 @@
-import jwt
-import pytest
-from datetime import datetime, timezone, timedelta
-
 from db_test_context import get_raw_connection
 
 
@@ -1669,8 +1665,8 @@ class TestDashboard:
 
     def test_dashboard_packing_off_ready_to_ship_includes_picked(self, client, auth_headers):
         """When packing is OFF, ready_to_ship includes PICKED orders."""
-        from test_shipping import _advance_so_to_picked
         from db_test_context import get_raw_connection
+        from test_shipping import _advance_so_to_picked
         _advance_so_to_picked(client, auth_headers, "SO-2026-001")
 
         conn = get_raw_connection()
@@ -1744,14 +1740,14 @@ class TestSettings:
 
     def test_update_settings(self, client, auth_headers):
         resp = client.put("/api/admin/settings", json={
-            "settings": {"count_show_expected": "false"}
+            "settings": {"allow_over_receiving": "false"}
         }, headers=auth_headers)
         assert resp.status_code == 200
 
         # Verify it was saved
         resp = client.get("/api/admin/settings", headers=auth_headers)
         settings = {s["key"]: s["value"] for s in resp.get_json()["settings"]}
-        assert settings.get("count_show_expected") == "false"
+        assert settings.get("allow_over_receiving") == "false"
 
     def test_update_packing_toggle(self, client, auth_headers):
         resp = client.put("/api/admin/settings", json={
@@ -2028,7 +2024,7 @@ class TestRepeatOffender21_ReceivingBinFilter:
         resp = client.get("/api/admin/bins?warehouse_id=1", headers=auth_headers)
         assert resp.status_code == 200
         bins = resp.get_json()["bins"]
-        types = set(b["bin_type"] for b in bins)
+        types = {b["bin_type"] for b in bins}
         assert len(types) > 1, f"Expected multiple bin types, got {types}"
 
 

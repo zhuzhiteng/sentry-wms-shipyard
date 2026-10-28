@@ -108,9 +108,8 @@ GET /api/shipyard/outbound/mobile/orders/<outbound_order_id>
 ```
 
 移动端接口同时校验角色和 `shipyard-outbound` 页面权限。列表、详情、吊牌拍照识别、
-旧扫码/照片兼容接口、整票确认、装车确认和出库照片下载都受同一门禁保护；只有
-`OUTBOUND` 角色但没有页面权限时返回 `403`。知道有效的任务或照片 ID 也不能绕过
-页面权限。
+整票确认、装车确认和出库照片下载都受同一门禁保护；只有 `OUTBOUND` 角色但没有
+页面权限时返回 `403`。知道有效的任务或照片 ID 也不能绕过页面权限。
 
 出库单状态：
 
@@ -124,7 +123,7 @@ GET /api/shipyard/outbound/mobile/orders/<outbound_order_id>
 ## 整票吊牌拍照识别与留证
 
 现场不使用二维码、条码或扫码设备。正常路径是每托拍一张吊牌原图，原图留证，
-同时由公网 OCR 识别吊牌打印字段。二维码字段只为历史数据兼容，不参与新流程。
+同时由公网 OCR 识别吊牌打印字段。二维码内容不解析、不保存，也不参与业务匹配。
 
 ### 拍摄并识别当前吊牌
 
@@ -180,10 +179,6 @@ GET /api/shipyard/outbound/mobile/orders/<outbound_order_id>
 
 OCR 服务未配置或暂时不可用时，照片和 `FAILED` 识别记录仍会保存，接口分别返回
 `503 ocr_unavailable` 或 `502 ocr_provider_error`。失败记录不能用于核销。
-
-旧接口 `POST /api/shipyard/outbound/tasks/<task_id>/scan` 和
-`POST /api/shipyard/outbound/tasks/<task_id>/photos` 仅为历史客户端兼容保留，
-不在当前现场操作和文档流程中使用。
 
 ## 确认整票出库
 
@@ -263,19 +258,18 @@ HTTPS API 域名、微信 request/uploadFile 合法域名和真实 AppID。
 
 ## 验证
 
-- 全后端：`3050 passed, 55 skipped, 11 warnings`；
-- 087 迁移在 `sentry_test` 连续执行两次成功；
+- 全后端：`3026 passed, 55 skipped, 11 warnings`；
+- 087、088、089 迁移在 `sentry_test` 连续执行两次成功；
 - 全新空库执行 `db/schema.sql` 后，正式出库、任务、核销和装车 4 类核心表均存在；
-- 管理端：33 个测试文件、204 项测试通过，生产构建通过；当前 Windows 主机上
-  默认并行模式会触发 Vitest fork/jsdom 超时，因此全量以 4 个分片、单 worker
-  运行；超时文件单独重跑均通过，未发现页面断言缺陷；
-- 微信小程序：17 项 Node 测试通过，触及 JavaScript 文件语法检查通过；
+- 管理端：干净 Node 20 依赖树中 33 个测试文件、201 项测试通过，生产构建通过；
+- 微信小程序：15 项 Node 测试通过；
 - 触及 Python 文件 Ruff、格式检查、Bandit 和 `git diff --check` 通过；
-- `pip-audit` 无已知漏洞，`npm audit` 为 0 个漏洞。
+- `pip-audit` 无已知漏洞，`npm audit` 为 0 个漏洞；
+- gitleaks 8.21.2 扫描 767 个提交，无泄漏；MkDocs 严格构建通过。
 
-全量权限矩阵固定覆盖 49 个船厂路由：无页面权限全部返回 `403`；26 个非 GET
-路由在拥有页面的只读账号下全部返回业务角色 `403`。区域船号映射更新已按映射
-实际所属仓库校验，仓库 2 主管不能使用仓库 1 的映射 ID 修改配置。
+权限矩阵动态枚举当前全部船厂路由：无页面权限全部返回 `403`；全部非 GET 路由
+在拥有页面的只读账号下返回业务角色 `403`。区域船号映射更新按映射实际所属仓库
+校验，仓库 2 主管不能使用仓库 1 的映射 ID 修改配置。
 
 本切片使用独立测试库完成了一次服务级完整闭环：创建船号绑定和区域 → 导入并确认
 到货清单 → 两次吊牌 OCR 收货 → 导入并确认正式出库清单 → 两次吊牌 OCR

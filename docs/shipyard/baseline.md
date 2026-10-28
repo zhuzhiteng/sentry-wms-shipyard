@@ -1,198 +1,83 @@
-# Shipyard WMS Baseline
+# 船厂仓储基线与验证
 
-## Upstream baseline
+更新日期：2026-10-28
 
-- Repository: `https://github.com/hightower-systems/sentry-wms`
-- Release tag: `v1.37.0`
-- Resolved commit: `9eac4653f6a74fc0631492cdbca23a0e8a45f3dd`
-- Internal branch: `codex/feat-shipyard-domain-20261027`
-- License: Apache-2.0
+## 仓库基线
 
-The upstream repository remains the `origin` remote. This project does not push
-to upstream.
+- 上游：`https://github.com/hightower-systems/sentry-wms`
+- 上游版本：`v1.37.0`
+- 上游提交：`9eac4653f6a74fc0631492cdbca23a0e8a45f3dd`
+- 交付仓库：`zhuzhiteng/sentry-wms-shipyard`
+- 业务分支：`codex/feat-shipyard-domain-20261027`
+- 许可证：Apache-2.0，保留 `LICENSE` 和 `NOTICE`
 
-## Open upstream work at intake
+船厂业务位于独立 `shipyard` 领域，通用 WMS 的认证、仓库、区域、用户、
+审计和基础库存能力仍作为技术基座使用。
 
-At baseline time, the upstream repository had two open pull requests:
+## 当前业务闭环
 
-- `#463`: sidebar permission filtering
-- `#464`: draft operation identities and allocation evidence
+1. 管理端维护船号、工程号、制作图绑定与区域船号定置。
+2. 导入到货清单，预览字段、重复行、缺失字段和区域冲突。
+3. 确认清单后生成票货和待收货任务。
+4. 小程序逐托拍吊牌，公网 OCR 识别字段，原图留证。
+5. 服务端强校验物料编码、品名、规格、绑定关系、托组后缀和数量。
+6. 收齐整票托盘后按实收入库；少件保留待补状态，补货累计补足。
+7. 管理端导入正式出库清单，匹配整票库存并暴露阻断项。
+8. 小程序逐托拍吊牌，整票齐套后一次扣库并记录流水。
+9. 全部票货完成后确认装车，形成原图、OCR、操作人和时间链路。
 
-Neither pull request is part of the baseline. Do not merge a draft or unreviewed
-upstream branch without a separate compatibility review.
+## 现场约束
 
-## Local environment
+- 不使用二维码、条码或扫码设备；
+- 不解析或保存工厂二维码内容；
+- 唯一现场端为原生微信小程序；
+- 一张吊牌只拍一次，原图同时用于留证和 OCR；
+- OCR 结果不能直接落库存，必须通过服务端字段校验；
+- 同一请求重试不能重复收货、扣库或装车。
 
-- Docker Engine: `29.8.0`
-- Docker Compose: `v5.5.1`
-- API: Flask 3.1.3 / Python 3.11
-- Database: PostgreSQL 16
-- Admin: React 19 / Vite 8
+## 已删除的非首期实现
 
-The development host already reserved TCP `5432`, so the ignored local
-`docker-compose.override.yml` maps PostgreSQL to `127.0.0.1:55432`. Container
-networking still uses `db:5432`.
+- Expo / React Native `mobile/` 应用及其安全、构建和测试配置；
+- 配送需求、派工单、前置仓发货单的 085 代码、文档、表和测试；
+- 二维码解析、扫码 API、二维码字段、索引和兼容测试；
+- 管理端旧的双工作区、配送、派工和发货单打印界面。
 
-Runtime secrets are generated in-process for local verification and are not
-written to the repository.
+迁移 `088_shipyard_remove_legacy_qr.sql` 清理二维码列和历史索引；
+迁移 `089_shipyard_remove_distribution_dispatch.sql` 清理由旧数据库遗留的
+配送、派工和发货单表。两者均支持重复执行。
 
-## Windows checkout fix
+## 验证原则
 
-The host Git configuration used `core.autocrlf=true`, which checked shell
-scripts out with CRLF line endings. PostgreSQL's Linux entrypoint then failed
-with:
+- 数据迁移必须覆盖全新空库、已有旧结构升级和重复执行；
+- 船厂收货、出库、权限和跨仓隔离使用独立 `sentry_test`；
+- 管理端测试必须在干净依赖树执行，生产构建必须通过；
+- 小程序测试覆盖一次拍摄、OCR 必填、多托齐套、幂等和错误恢复；
+- HTTP E2E 覆盖登录、配置、清单、收货、出库、装车、照片字节和数据库不变量；
+- 依赖审计、密钥扫描、Ruff、Bandit、`git diff --check` 均为交付门槛。
 
-```text
-/docker-entrypoint-initdb.d/02-seed.sh: cannot execute: required file not found
-```
+自动测试中的 OCR 是确定性 stub。它证明事务、字段校验和证据链路，不证明真实
+百度 OCR 对现场吊牌的识别率。
 
-The repository now contains a minimal `.gitattributes` rule requiring LF for
-all shell scripts. This change is required for Docker Compose to work on
-Windows.
+## 当前验证与交付
 
-## Verification
+- 清理代码提交：`1a149b7865811874847e707650ff92c880a8623e`；
+- CI 配置测试修复提交：`df859d3d3b75f7f79cda9d2c16c67f99435bf98f`；
+- 交付 PR：`https://github.com/zhuzhiteng/sentry-wms-shipyard/pull/1`；
+- 后端全量：`3026 passed, 55 skipped, 11 warnings`；
+- 管理端：33 个测试文件、201 项通过，生产构建通过；
+- 微信小程序：15 项通过；
+- PR required checks：Tests `40706673891`、Dependency Audit `40706673580`、
+  gitleaks `40706673621`、Lockfile Version Check `40706673906` 全部通过；
+- 本交付没有生产部署、真实 OCR、微信真机或船厂 UAT 证据。
 
-Commands use a dedicated `sentry_test` database.
+## 当前发布结论
 
-```text
-Backend: 3050 passed, 55 skipped, 11 warnings
-Admin:   33 test files passed, 204 tests passed
-Miniprogram: 17 tests passed
-Admin build: production build passed
-Schema:  087 applied twice to test; fresh db/schema.sql created
-HTTP E2E: passed (50 requests/10 concurrent; 250 requests/50 concurrent stress)
-```
+代码、自动测试和模拟流程通过只说明研发侧可交付，不等于生产可用。以下事项仍需
+外部条件与现场证据：
 
-The admin suite passed as four serialized-worker shards: each shard ran eight
-files with `--no-file-parallelism`. The default parallel invocation on this
-Windows host hit Vitest fork startup and jsdom timeout failures; every affected
-file passed when rerun alone, so this is recorded as a test-host stability
-limitation rather than a product assertion failure.
+- 真实公网 OCR 凭据、样本和识别率验收；
+- 微信 AppID、HTTPS 合法域名、隐私声明和 iOS/Android 真机验收；
+- 真实船厂吊牌、弱网、上传中断和重复操作演练；
+- 备份恢复、迁移窗口、回滚演练和仓库/船厂 UAT。
 
-The API test command must override the container's production environment:
-
-```powershell
-docker compose exec -T `
-  -e TEST_DATABASE_URL=$testDbUrl `
-  -e FLASK_ENV=development `
-  -e SENTRY_ALLOW_INTERNAL_WEBHOOKS=false `
-  -e SENTRY_ALLOW_HTTP_WEBHOOKS=false `
-  api python -m pytest tests/ -q
-```
-
-The standalone HTTP E2E uses the same isolated `sentry_test` database and
-restores its seed data after the run:
-
-```powershell
-docker compose exec -T `
-  -e TEST_DATABASE_URL=$testDbUrl `
-  api python tests/e2e_shipyard_http.py
-```
-
-It starts a loopback Flask server, then performs login, binding/zone setup,
-inbound manifest confirmation and concurrent receipt idempotency, formal
-outbound confirmation, wrong-material-name rejection, OCR provider failure with
-photo/FAILED-record retention, missing-suffix recovery, stock depletion,
-concurrent loading idempotency, refreshed backend reads and photo-byte
-verification. It also verifies role/page permission gates and cross-warehouse
-isolation. OCR is a deterministic test stub because CI has no public-cloud
-credentials.
-
-Receipt, outbound confirmation and loading each submit 50 requests through 10
-concurrent workers with the same idempotency key. At the end of the run,
-database invariant queries verify ticket balance against the stock ledger,
-receipt totals, the single outbound ledger entry, per-pallet photo/OCR ownership,
-pallet status, and the unique loading confirmation.
-
-`test_shipyard_permission_matrix.py` enumerates all 49 current shipyard routes:
-every route must return `403` without its page permission, and all 26 non-GET
-routes must return `403` for a viewer with those pages but no business role.
-The same suite reproduces warehouse-2 manager access to a warehouse-1 zone
-mapping and requires `403`.
-
-The standalone E2E resets the process-local rate limiter at startup, so repeat
-runs do not inherit the previous run's `300/min` request count. It accepts
-`SHIPYARD_E2E_REQUEST_COUNT` and `SHIPYARD_E2E_MAX_WORKERS` for bounded stress
-runs.
-
-JWT validation allows a 5-second clock skew by default, with a hard 60-second
-maximum. This prevents a newly issued token from becoming temporarily invalid
-when the host wall clock adjusts by one or two seconds. Tests accept a future
-`iat` of 2 seconds and still reject 30 seconds; two consecutive
-250-request/50-worker E2E runs passed.
-
-The development override avoids production-only webhook SSRF startup guards.
-It does not disable authentication, tenant checks, or inventory locking.
-
-## Dependency findings
-
-The shipyard dependency review upgraded Vite to 8.3.5, Vitest to 4.1.12,
-PyJWT to 2.15.0, and refreshed the remaining locked transitive packages. The
-API image now pins `pip` 26.2.2 and `setuptools` 84.2.1 to clear advisories
-inherited from the Python base image.
-
-- `pip-audit`: no known vulnerabilities;
-- `npm audit`: 0 vulnerabilities;
-- admin test suite: 32 files and 200 tests passed;
-- admin production build: passed;
-- the files touched by the shipyard outbound slice pass ESLint; the repository
-  still carries pre-existing lint debt outside this slice.
-
-The admin lint debt is not introduced by the shipyard domain and must not be
-described as clean until it is reduced and re-verified.
-
-## Current status
-
-The upstream application builds and its original test suites pass on this
-workstation. The first shipyard slice is implemented: temporal project/zone
-configuration, fixed-template inbound manifest parsing, source-file retention,
-binding enforcement, manifest void/reimport, and one cargo ticket per source
-row.
-
-The second slice is implemented as a separate ticket-level stock ledger:
-photo-based label OCR, server-side field validation, per-pallet photo evidence,
-actual quantity receipt, shortage reporting, replenishment and idempotent
-confirmation. QR input remains only as a legacy compatibility path and is not
-used by the current mini-program workflow.
-
-The third slice adds shipyard distribution-demand Excel recognition,
-warehouse-scoped dispatch matching, source-line lineage and printable front
-warehouse delivery notes. `085_shipyard_outbound_documents.sql` is idempotent
-and the consolidated `db/schema.sql` contains the same final structures.
-The React admin now exposes `/shipyard-outbound` for import review, match
-resolution, delivery-note generation and printing.
-
-Shipyard role templates now cover manager, receiver, outbound operator and
-read-only auditor, with development-only virtual user seeding. The React admin
-exposes `/shipyard-settings` for ship/project bindings and zone-to-ship
-placement rules.
-
-The fourth shipyard slice adds formal outbound-manifest recognition, exact
-material-code/item/spec stock matching, whole-ticket multi-label photo OCR,
-per-pallet outbound photo evidence, one-time stock depletion, loading
-confirmation and a native WeChat mini-program for receiving and outbound work.
-Migration `086_shipyard_formal_outbound.sql` is idempotent and the consolidated
-schema contains the same structures. Generic Sentry `items` / `inventory`
-synchronization remains deferred until the shipyard material-code mapping is
-agreed.
-
-The formal-outbound mobile routes require both a shipyard mobile role and the
-`shipyard-outbound` page permission. This includes list/detail reads, photo OCR,
-legacy scan/photo compatibility routes, whole-ticket confirmation, loading
-confirmation and evidence downloads. Knowing a valid task or photo ID does not
-bypass the page-permission gate.
-
-## Delivery status
-
-At 2026-10-28, the canonical delivery repository is
-`zhuzhiteng/sentry-wms-shipyard`, an independent public repository preserving
-the complete Apache-2.0 history, tags and NOTICE. The validated source commit is
-`197497e49ed423f55b80815e3bda791ff591c3ba`; a later documentation-only commit
-records the same evidence on `main`. The same-repository runs completed
-successfully: Tests `40679653372`, Dependency Audit `40679653425`, gitleaks
-`40679653626` and Lockfile Version Check `40679653594`.
-
-Upstream PR #465 remains open as provenance, but it is no longer a release
-gate. GitHub still reports it as `mergeable_state=blocked` because a first-time
-fork contributor requires maintainer approval; the independent repository
-does not have that fork workflow restriction. Nothing is deployed.
+在上述事项完成前，生产结论保持 `NO-GO`，且不得虚构部署、真机或业务验收结果。

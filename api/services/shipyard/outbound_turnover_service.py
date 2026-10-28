@@ -76,10 +76,6 @@ def _decimal_text(value: Any) -> str:
     return format(Decimal(value), "f")
 
 
-def _hash_qr(payload: str) -> str:
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
 def _normalized(value: str | None) -> str:
     return (value or "").strip().casefold()
 
@@ -165,8 +161,7 @@ def _task_pallets(db, ticket_id: str, *, for_update: bool = False):
     return db.execute(
         text(
             f"""
-            SELECT pallet_id, ticket_id, tag_suffix, qr_payload,
-                   qr_payload_sha256, factory_pallet_no,
+            SELECT pallet_id, ticket_id, tag_suffix, factory_pallet_no,
                    installation_pallet_no, batch_no, status
               FROM shipyard_pallet_units
              WHERE ticket_id = :ticket_id
@@ -197,26 +192,6 @@ def _ensure_task_pending(context) -> None:
             "当前票货没有可用库存",
             {"ticket_id": str(context.ticket_id)},
         )
-
-
-def _pallet_by_qr(db, qr_hash: str):
-    return db.execute(
-        text(
-            """
-            SELECT p.pallet_id, p.ticket_id, p.tag_suffix, p.qr_payload,
-                   p.qr_payload_sha256, p.factory_pallet_no,
-                   p.installation_pallet_no, p.batch_no, p.status,
-                   t.task_id, t.task_no, t.outbound_order_id,
-                   t.status AS task_status
-              FROM shipyard_pallet_units p
-              LEFT JOIN shipyard_outbound_tasks t
-                ON t.ticket_id = p.ticket_id
-             WHERE p.qr_payload_sha256 = :qr_hash
-             LIMIT 1
-            """
-        ),
-        {"qr_hash": qr_hash},
-    ).fetchone()
 
 
 def _field_mismatches(context, scan) -> list[dict[str, Any]]:
@@ -258,93 +233,6 @@ def _field_mismatches(context, scan) -> list[dict[str, Any]]:
                 }
             )
     return mismatches
-
-
-def validate_outbound_pallet_scan(
-    db,
-    *,
-    task_id: str,
-    scan,
-) -> dict[str, Any]:
-    if not scan.qr_payload:
-        raise OutboundValidationError("请使用吊牌照片识别接口")
-    if not scan.material_code or not scan.item_name:
-        raise OutboundValidationError(
-            "旧版扫码接口必须提供物料编码和品名",
-            {"required_fields": ["material_code", "item_name"]},
-        )
-    context = _task_context(db, task_id)
-    if context is None:
-        raise OutboundTaskNotFoundError("出库任务不存在")
-    _ensure_task_pending(context)
-    qr_hash = _hash_qr(scan.qr_payload.strip())
-    pallet = _pallet_by_qr(db, qr_hash)
-    if pallet is None:
-        raise OutboundValidationError(
-            "吊牌不在已收货库存中",
-            {"qr_payload_sha256": qr_hash},
-        )
-    if str(pallet.ticket_id) != str(context.ticket_id):
-        raise OutboundValidationError(
-            "吊牌属于其他票货",
-            {
-                "tag_suffix": pallet.tag_suffix,
-                "matched_task_id": (str(pallet.task_id) if pallet.task_id else None),
-                "matched_task_no": pallet.task_no,
-                "matched_outbound_order_id": (
-                    str(pallet.outbound_order_id) if pallet.outbound_order_id else None
-                ),
-            },
-        )
-    if pallet.status != SHIPYARD_PALLET_STORED:
-        raise OutboundStateError(
-            "吊牌对应托盘不是可出库在库状态",
-            {
-                "pallet_id": str(pallet.pallet_id),
-                "status": pallet.status,
-            },
-        )
-    if scan.tag_suffix != pallet.tag_suffix:
-        raise OutboundValidationError(
-            "扫描后缀与吊牌实际托盘后缀不一致",
-            {
-                "scanned_tag_suffix": scan.tag_suffix,
-                "stored_tag_suffix": pallet.tag_suffix,
-            },
-        )
-    if scan.batch_no and _normalized(scan.batch_no) != _normalized(pallet.batch_no):
-        raise OutboundValidationError(
-            "扫描批次号与吊牌库存不一致",
-            {"expected": pallet.batch_no, "actual": scan.batch_no},
-        )
-    mismatches = _field_mismatches(context, scan)
-    if mismatches:
-        raise OutboundValidationError(
-            "吊牌共同信息与出库任务不一致",
-            {"mismatches": mismatches},
-        )
-    return {
-        "matched": True,
-        "task": {
-            "task_id": str(context.task_id),
-            "task_no": context.task_no,
-            "planned_quantity": _decimal_text(context.planned_quantity),
-            "expected_tag_suffixes": list(context.expected_tag_suffixes),
-            "material_code": context.material_code,
-            "item_name": context.item_name,
-            "item_spec": context.item_spec,
-            "location_path_snapshot": context.location_path_snapshot,
-        },
-        "pallet": {
-            "pallet_id": str(pallet.pallet_id),
-            "tag_suffix": pallet.tag_suffix,
-            "qr_payload_sha256": pallet.qr_payload_sha256,
-            "factory_pallet_no": pallet.factory_pallet_no,
-            "installation_pallet_no": pallet.installation_pallet_no,
-            "batch_no": pallet.batch_no,
-            "status": pallet.status,
-        },
-    }
 
 
 def _photo_payload(row) -> dict[str, Any]:
@@ -780,8 +668,7 @@ def _confirmation_summary(db, confirmation_id: str) -> dict[str, Any]:
     pallets = db.execute(
         text(
             """
-            SELECT rp.pallet_id, rp.tag_suffix, rp.qr_payload,
-                   rp.qr_payload_sha256, rp.photo_id,
+            SELECT rp.pallet_id, rp.tag_suffix, rp.photo_id,
                    rp.label_recognition_id,
                    lr.status AS label_recognition_status,
                    lr.fields AS label_recognition_fields,
@@ -829,8 +716,6 @@ def _confirmation_summary(db, confirmation_id: str) -> dict[str, Any]:
             {
                 "pallet_id": str(pallet.pallet_id),
                 "tag_suffix": pallet.tag_suffix,
-                "qr_payload": pallet.qr_payload,
-                "qr_payload_sha256": pallet.qr_payload_sha256,
                 "label_recognition": {
                     "recognition_id": str(pallet.label_recognition_id),
                     "status": pallet.label_recognition_status,
@@ -940,49 +825,34 @@ def confirm_outbound_task(
     seen_pallet_ids = set()
     for scan in validated.pallets:
         pallet = pallet_by_suffix[scan.tag_suffix]
-        qr_hash = None
-        if scan.label_recognition_id:
-            recognition = load_label_recognition(
-                db,
-                str(scan.label_recognition_id),
-                ticket_id=str(context.ticket_id),
-                task_id=str(context.task_id),
-                photo_id=str(scan.photo_id),
-                for_update=True,
+        recognition = load_label_recognition(
+            db,
+            str(scan.label_recognition_id),
+            ticket_id=str(context.ticket_id),
+            task_id=str(context.task_id),
+            photo_id=str(scan.photo_id),
+            for_update=True,
+        )
+        if recognition.status == SHIPYARD_LABEL_RECOGNITION_FAILED:
+            raise OutboundValidationError(
+                "吊牌 OCR 识别失败，请重新拍照",
+                {"tag_suffix": scan.tag_suffix},
             )
-            if recognition.status == SHIPYARD_LABEL_RECOGNITION_FAILED:
-                raise OutboundValidationError(
-                    "吊牌 OCR 识别失败，请重新拍照",
-                    {"tag_suffix": scan.tag_suffix},
-                )
-            recognized_suffix = _normalize_suffix(
-                str(dict(recognition.fields or {}).get("tag_suffix") or "")
+        recognized_suffix = _normalize_suffix(
+            str(dict(recognition.fields or {}).get("tag_suffix") or "")
+        )
+        if recognized_suffix and recognized_suffix != scan.tag_suffix:
+            raise OutboundValidationError(
+                "OCR 托盘后缀与本次提交不一致",
+                {
+                    "expected": recognized_suffix,
+                    "actual": scan.tag_suffix,
+                },
             )
-            if recognized_suffix and recognized_suffix != scan.tag_suffix:
-                raise OutboundValidationError(
-                    "OCR 托盘后缀与本次提交不一致",
-                    {
-                        "expected": recognized_suffix,
-                        "actual": scan.tag_suffix,
-                    },
-                )
-            effective_scan = recognition_scan_view(
-                recognition,
-                suffix=scan.tag_suffix,
-            )
-        else:
-            if not scan.qr_payload:
-                raise OutboundValidationError(
-                    "吊牌照片缺少 OCR 识别结果，请重新拍照",
-                    {"tag_suffix": scan.tag_suffix},
-                )
-            qr_hash = _hash_qr(scan.qr_payload.strip())
-            if pallet.qr_payload_sha256 != qr_hash:
-                raise OutboundValidationError(
-                    "扫描二维码与托盘实际吊牌不一致",
-                    {"tag_suffix": scan.tag_suffix},
-                )
-            effective_scan = scan
+        effective_scan = recognition_scan_view(
+            recognition,
+            suffix=scan.tag_suffix,
+        )
         if pallet.status != SHIPYARD_PALLET_STORED:
             raise OutboundStateError(
                 "托盘不是可出库在库状态",
@@ -999,8 +869,7 @@ def confirm_outbound_task(
                 {"tag_suffix": scan.tag_suffix},
             )
         mismatches = _field_mismatches(context, effective_scan)
-        if scan.label_recognition_id:
-            append_required_field_mismatches(mismatches, effective_scan)
+        append_required_field_mismatches(mismatches, effective_scan)
         if mismatches:
             raise OutboundValidationError(
                 "吊牌共同信息与出库任务不一致",
@@ -1041,7 +910,6 @@ def confirm_outbound_task(
                 "scan": effective_scan,
                 "pallet": pallet,
                 "photo": photo,
-                "qr_hash": qr_hash,
                 "label_recognition_id": scan.label_recognition_id,
             }
         )
@@ -1096,22 +964,16 @@ def confirm_outbound_task(
                 """
                 INSERT INTO shipyard_outbound_confirmation_pallets
                     (confirmation_id, pallet_id, tag_suffix,
-                     qr_payload, qr_payload_sha256, photo_id,
-                     label_recognition_id)
+                     photo_id, label_recognition_id)
                 VALUES
                     (:confirmation_id, :pallet_id, :tag_suffix,
-                     :qr_payload, :qr_payload_sha256, :photo_id,
-                     :label_recognition_id)
+                     :photo_id, :label_recognition_id)
                 """
             ),
             {
                 "confirmation_id": confirmation_id,
                 "pallet_id": str(item["pallet"].pallet_id),
                 "tag_suffix": item["pallet"].tag_suffix,
-                "qr_payload": item["pallet"].qr_payload,
-                "qr_payload_sha256": (
-                    item["qr_hash"] or item["pallet"].qr_payload_sha256
-                ),
                 "photo_id": str(item["photo"].photo_id),
                 "label_recognition_id": item["label_recognition_id"],
             },

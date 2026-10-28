@@ -1,7 +1,5 @@
 import uuid
 
-from shipyard.helpers import dispatch_line_payload
-
 
 def _login(client, username, password):
     response = client.post(
@@ -79,8 +77,7 @@ def test_receiver_is_role_scoped_and_cannot_edit_documents(client, auth_headers)
     assert import_attempt.get_json()["error"] == "role_forbidden"
 
     receipt_attempt = client.post(
-        f"/api/shipyard/inbound/tickets/{uuid.uuid4()}/scan",
-        json={"qr_payload": "not-a-real-ticket"},
+        f"/api/shipyard/inbound/tickets/{uuid.uuid4()}/label-recognition",
         headers=receiver_headers,
     )
     assert receipt_attempt.status_code != 403
@@ -98,24 +95,19 @@ def test_outbound_role_can_read_but_cannot_import_or_change_config(
     )
 
     listing = client.get(
-        "/api/shipyard/outbound/dispatches?warehouse_id=1",
+        "/api/shipyard/outbound/mobile/orders?warehouse_id=1",
         headers=outbound_headers,
     )
     assert listing.status_code == 200
 
-    create_dispatch = client.post(
-        "/api/shipyard/outbound/dispatches",
-        json={
-            "warehouse_id": 1,
-            "dispatch_no": "PT-ROLE-DENIED",
-            "dispatch_date": "2026-10-27",
-            "idempotency_key": f"dispatch-{uuid.uuid4()}",
-            "lines": [dispatch_line_payload()],
-        },
+    import_attempt = client.post(
+        "/api/shipyard/outbound/formal-manifests/preview",
+        data={"warehouse_id": "1"},
+        content_type="multipart/form-data",
         headers=outbound_headers,
     )
-    assert create_dispatch.status_code == 403
-    assert create_dispatch.get_json()["error"] == "role_forbidden"
+    assert import_attempt.status_code == 403
+    assert import_attempt.get_json()["error"] == "role_forbidden"
 
     config = client.get("/api/shipyard/bindings", headers=outbound_headers)
     assert config.status_code == 403
@@ -162,7 +154,7 @@ def test_viewer_is_read_only(client, auth_headers):
     )
 
     listing = client.get(
-        "/api/shipyard/outbound/delivery-notes?warehouse_id=1",
+        "/api/shipyard/outbound/orders?warehouse_id=1",
         headers=viewer_headers,
     )
     assert listing.status_code == 200

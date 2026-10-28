@@ -18,7 +18,7 @@ verified end-to-end.
 import importlib
 import os
 import sys
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 os.environ.setdefault("SENTRY_TOKEN_PEPPER", "NEVER_USE_THIS_PEPPER_IN_PRODUCTION")
 os.environ.setdefault(
@@ -143,13 +143,13 @@ MATRIX: dict = {
         "TestIntegrationEventsNotifyTriggerChain.test_insert_then_commit_fires_visibility_notify",
     ),
     26: Manual(
-        "Chainway C6000 smoke: receive, pick, pack, ship; events produced; "
-        "dispatcher POSTs to scratch consumer within latency budget"
+        "Shipyard mini-program real-device smoke: login, label photo/OCR, "
+        "whole-ticket receipt, outbound and loading confirmation"
     ),
 }
 
 
-def _resolve_qualname(module, qualname: str) -> Optional[object]:
+def _resolve_qualname(module, qualname: str) -> object | None:
     """Walk ``ClassName.method`` (or bare function name) inside the
     imported module. Returns the resolved attribute or None when
     any step misses."""
@@ -208,5 +208,5 @@ def test_manual_entries_logged_for_pre_merge_sweep(caplog):
         r for r in caplog.records if "MATRIX MANUAL" in r.message
     ]
     # Three operator gates at v1.6.0: full-suite-green baseline (point 1),
-    # admin browser sweep (14), and Chainway C6000 smoke (26).
+    # admin browser sweep (14), and shipyard mini-program smoke (26).
     assert len(manual_records) == 3

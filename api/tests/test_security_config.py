@@ -113,17 +113,18 @@ class TestV042_DependencyAuditInCI:
         """
         workflow = _read(".github/workflows/audit.yml")
         assert "npm_audit_gate.py" in workflow
-        # One invocation per npm job: admin, mobile prod tree, mobile full tree.
-        assert workflow.count("npm_audit_gate.py") >= 3
+        assert workflow.count(
+            'run: python3 "${{ github.workspace }}/.github/scripts/npm_audit_gate.py"'
+        ) == 1
         # The bare npm command must not be the gate any more -- a plain
         # `npm audit` without the wrapper would ignore the allowlist rules.
         assert "run: npm audit" not in workflow
 
-    def test_covers_api_admin_mobile(self):
+    def test_covers_api_and_admin(self):
         workflow = _read(".github/workflows/audit.yml")
         assert "api/requirements.txt" in workflow
         assert "working-directory: admin" in workflow
-        assert "working-directory: mobile" in workflow
+        assert "working-directory: mobile" not in workflow
 
     def test_runs_on_push_and_schedule(self):
         workflow = _read(".github/workflows/audit.yml")

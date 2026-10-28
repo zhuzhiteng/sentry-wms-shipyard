@@ -82,7 +82,7 @@ Product catalog management.
 - List all user accounts with role, warehouse assignments, and active status
 - **Create user** with username, password, full name, role (ADMIN or USER)
 - **Warehouse assignment** - multi-select warehouses the user can access
-- **Module access** - checkboxes for mobile functions (Pick, Pack, Ship, Receive, Put-Away, Count, Transfer)
+- **Module access** - field/API function grants plus shipyard receive and outbound permissions
 - **Edit** any field including password reset
 - **Delete** hard delete (cannot delete yourself or the last admin)
 
@@ -219,8 +219,6 @@ System configuration:
     - Allow over-receiving (checkbox)
 - **Inventory**
     - Require separate approver for cycle count adjustments (checkbox)
-- **Mobile App**
-    - Show expected quantities during cycle counts (checkbox)
 - **Manual Entry** - create POs and SOs directly (for standalone deployments)
 - **About** - version number and repository link
 

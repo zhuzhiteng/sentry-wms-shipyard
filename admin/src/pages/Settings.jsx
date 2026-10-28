@@ -46,7 +46,6 @@ export default function Settings() {
 
     // Load all settings
     Promise.all([
-      api.get('/admin/settings/count_show_expected'),
       api.get('/admin/settings/require_packing_before_shipping'),
       api.get('/admin/settings/allow_over_receiving'),
       api.get('/admin/settings/default_receiving_bin'),
@@ -67,7 +66,6 @@ export default function Settings() {
         }
       }
       // Set defaults for missing settings
-      if (!('count_show_expected' in initial)) initial.count_show_expected = 'true';
       if (!('require_packing_before_shipping' in initial)) initial.require_packing_before_shipping = 'true';
       if (!('allow_over_receiving' in initial)) initial.allow_over_receiving = 'true';
       if (!('default_receiving_bin' in initial)) initial.default_receiving_bin = '';
@@ -403,7 +401,7 @@ export default function Settings() {
             ))}
           </select>
         </div>
-        <p className="settings-note">The default bin where received items are staged. Mobile users can override this per session.</p>
+        <p className="settings-note">The default bin where received items are staged. Authorized operators can override this per session.</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', marginTop: 8 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
             <input
@@ -415,22 +413,6 @@ export default function Settings() {
           </label>
         </div>
         <p className="settings-note">When enabled, users can receive more than the PO quantity (with a warning). When disabled, over-receiving is blocked.</p>
-      </div>
-
-      {/* Mobile App Settings */}
-      <div className="settings-section">
-        <h3>Mobile App</h3>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
-            <input
-              type="checkbox"
-              checked={toBool(draftSettings.count_show_expected)}
-              onChange={(e) => updateDraft('count_show_expected', String(e.target.checked))}
-            />
-            Show expected quantities during cycle counts
-          </label>
-        </div>
-        <p className="settings-note">When disabled, counters won't see expected quantities - useful for blind counts.</p>
       </div>
 
       {/* Inventory */}
