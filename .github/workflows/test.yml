@@ -43,6 +43,13 @@ jobs:
         with:
           python-version: '3.11'
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run mini-program tests
+        run: node --test miniprogram/tests/*.test.js
+
       - name: Install dependencies
         run: pip install -r api/requirements.txt
 
