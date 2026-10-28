@@ -273,8 +273,6 @@ def test_photo_ocr_receipt_and_outbound_need_no_qr_code(
         SELECT COUNT(*)
           FROM shipyard_pallet_units
          WHERE ticket_id = %s
-           AND qr_payload IS NULL
-           AND qr_payload_sha256 IS NULL
            AND label_fields ? 'material_code'
            AND label_fields ? 'item_name'
         """,

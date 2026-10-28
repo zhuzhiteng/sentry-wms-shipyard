@@ -1,17 +1,8 @@
-"""Schema tests for migration 087 (photo-based label OCR)."""
+"""Current schema coverage for photo-based label OCR."""
 
 import os
 
 import psycopg2
-
-MIGRATION_PATH = os.path.join(
-    os.path.dirname(__file__),
-    "..",
-    "..",
-    "db",
-    "migrations",
-    "087_shipyard_label_ocr.sql",
-)
 
 
 def _connection():
@@ -30,17 +21,11 @@ def test_ocr_recognition_table_and_evidence_columns_exist():
               FROM information_schema.columns
              WHERE table_schema = 'public'
                AND table_name = 'shipyard_pallet_units'
-               AND column_name IN (
-                   'qr_payload', 'qr_payload_sha256', 'label_fields'
-               )
+               AND column_name = 'label_fields'
              ORDER BY column_name
             """
         )
-        assert cursor.fetchall() == [
-            ("label_fields", "jsonb", "NO"),
-            ("qr_payload", "text", "YES"),
-            ("qr_payload_sha256", "character", "YES"),
-        ]
+        assert cursor.fetchall() == [("label_fields", "jsonb", "NO")]
 
         cursor.execute(
             """
@@ -59,17 +44,6 @@ def test_ocr_recognition_table_and_evidence_columns_exist():
 
         cursor.execute(
             """
-            SELECT is_nullable
-              FROM information_schema.columns
-             WHERE table_schema = 'public'
-               AND table_name = 'shipyard_outbound_confirmation_pallets'
-               AND column_name = 'qr_payload'
-            """
-        )
-        assert cursor.fetchone() == ("YES",)
-
-        cursor.execute(
-            """
             SELECT data_type
               FROM information_schema.columns
              WHERE table_schema = 'public'
@@ -80,16 +54,4 @@ def test_ocr_recognition_table_and_evidence_columns_exist():
         assert cursor.fetchone() == ("uuid",)
     finally:
         connection.rollback()
-        connection.close()
-
-
-def test_migration_is_idempotent():
-    with open(MIGRATION_PATH, encoding="utf-8") as migration:
-        sql = migration.read()
-    connection = psycopg2.connect(os.environ["DATABASE_URL"])
-    connection.autocommit = True
-    try:
-        connection.cursor().execute(sql)
-        connection.cursor().execute(sql)
-    finally:
         connection.close()

@@ -5,12 +5,12 @@
 ### Prerequisites
 
 - Docker and Docker Compose
-- Node.js 18+ (for mobile app development)
+- 微信开发者工具（仅小程序真机联调时需要）
 
 ### Setup
 
 ```bash
-git clone https://github.com/hightower-systems/sentry-wms.git
+git clone https://github.com/zhuzhiteng/sentry-wms-shipyard.git
 cd sentry-wms
 cp .env.example .env
 # Generate the five required secrets and paste them into .env:
@@ -170,7 +170,7 @@ DATABASE_URL=postgresql://user:pass@db:5432/sentry
 POSTGRES_USER=your-db-user
 POSTGRES_PASSWORD=your-db-password
 
-# Allowed browser origins for the admin panel / mobile
+# Allowed browser origins for the admin panel / mini-program development
 CORS_ORIGINS=https://your-admin-domain.com
 ```
 
@@ -266,7 +266,7 @@ and does not ship to production.
 The API serves HTTP only. For HTTPS, put a reverse proxy in front:
 
 ```
-Browser / mobile app --> HTTPS --> nginx / Caddy / Traefik / ALB --> HTTP --> gunicorn:5000
+Browser / 微信小程序 --> HTTPS --> nginx / Caddy / Traefik / ALB --> HTTP --> gunicorn:5000
 ```
 
 #### TRUST_PROXY (required behind a reverse proxy)
@@ -442,52 +442,18 @@ The k6 script at `tools/loadtest/inbound_v1_7.js` drives all five inbound endpoi
 
 ---
 
-## Mobile App
+## 微信小程序
 
-### Sideloading the APK
+现场端只发布 `miniprogram/`，不提供 Expo、APK 或扫码枪链路。部署前配置：
 
-Download the APK from the [GitHub Releases](https://github.com/hightower-systems/sentry-wms/releases) page. **`sentry-wms-v1.5.1.apk`** is the current recommended baseline; v1.6.0, v1.6.1, and v1.7.0 ship no mobile code changes (the dispatcher daemon, admin Webhooks page, the v1.6.1 webhook security patch, and the v1.7.0 inbound API are server-side surfaces) and the v1.5.1 APK carries the dependency-tree security overrides from #158 and #61. Operators still on v1.4.1 or v1.4.3 should install v1.5.1 to pick up those fixes.
+1. 在微信公众平台注册企业主体小程序并取得 AppID；
+2. 将 API 部署在 HTTPS 域名；
+3. 在“开发管理 → 开发设置”中配置 request 和 uploadFile 合法域名；
+4. 更新 `miniprogram/config.js` 的 API 地址；
+5. 使用微信开发者工具上传体验版，完成真机验收后再提审。
 
-Install via ADB:
+小程序使用现有 `/api/auth/login` 登录，不创建第二套用户体系。吊牌照在同一张
+原图上完成 OCR 识别和留证，现场不使用二维码、条码或扫码设备。
 
-```bash
-adb install sentry-wms-v1.5.1.apk
-```
-
-Or transfer the APK to the device and open it from the file manager.
-
-### First Launch
-
-On first launch, the app prompts for the API server URL:
-
-1. Enter your server's IP and port (e.g., `http://10.0.0.150:5000`)
-2. The app runs a health check before accepting the URL
-3. Log in with your admin credentials
-4. Select a warehouse (shown as a blocking modal after login)
-
-The server URL can be changed later from Settings in the user dropdown menu.
-
-### Broadcast Intent Scanning (Chainway C6000)
-
-For hardware scanners that use Android broadcast intents instead of keyboard wedge:
-
-1. Open Settings from the user dropdown
-2. Switch scan mode from KEYBOARD to INTENT
-3. Configure the intent action and extra key for your device
-
-Default values for Chainway C6000:
-
-- Intent action: `com.android.scanner.BARCODE_READ`
-- Extra key: `barcode_string`
-
-### Expo Go (Development)
-
-For development testing without building an APK:
-
-```bash
-cd mobile
-npm install
-npx expo start --clear
-```
-
-Scan the QR code with Expo Go on your device. Set the API URL to your dev machine's IP.
+正式上线前必须完成真实 OCR、弱网重试、隐私声明、AppID、合法域名、真机 UAT
+和船厂业务验收。未完成时生产状态保持 `NO-GO`。

@@ -102,13 +102,6 @@ ALL_TABLES = [
     "inbound_source_systems_allowlist",
     # Shipyard downstream tables. They reference base warehouses, bins, and
     # items, so they must be wiped before those base tables below.
-    "shipyard_delivery_lines",
-    "shipyard_delivery_notes",
-    "shipyard_dispatch_lines",
-    "shipyard_dispatch_orders",
-    "shipyard_distribution_lines",
-    "shipyard_distribution_files",
-    "shipyard_distribution_imports",
     "shipyard_outbound_loading_confirmations",
     "shipyard_outbound_confirmation_pallets",
     "shipyard_outbound_confirmations",

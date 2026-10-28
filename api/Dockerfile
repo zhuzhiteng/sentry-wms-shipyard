@@ -22,7 +22,7 @@ RUN python -m pip install --no-cache-dir --upgrade \
     setuptools==84.2.1
 
 # Build context is the repo root (so we can COPY db/mappings alongside
-# the api source). The repo-root .dockerignore strips admin/, mobile/,
+# the api source). The repo-root .dockerignore strips admin/,
 # docs/, .git, etc. so the context stays small.
 COPY api/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

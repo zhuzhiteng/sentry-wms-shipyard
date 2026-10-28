@@ -94,7 +94,8 @@ DELETE FROM wms_tokens WHERE created_at < '2026-MM-DD HH:MM:SS+00'::timestamptz;
 
 - **Connectors:** every X-WMS-Token stops authenticating the moment the api container restarts. Connectors that are actively polling will get 401s on their next poll. Connectors that are mid-snapshot will get 410 Gone on their next page (the snapshot-keeper's held scan rows reference `created_by_token_id`, but the token lookup now fails).
 - **Admin panel:** unaffected. Cookie auth does not use the pepper.
-- **Mobile (Chainway C6000):** unaffected. Mobile talks to `/api/receiving/*`, `/api/picking/*`, etc. with JWT + cookie auth; it never sees the v1.5.0 `/api/v1/*` surface.
+- **微信小程序：**不受影响。小程序使用 JWT + cookie 认证访问船厂 API，不读取
+  `/api/v1/*` 的连接器令牌接口。
 - **Outbox emission:** unaffected. The seven emission sites write directly to `integration_events` inside the handler's DB transaction; no token auth involved.
 
 ## What you do NOT need to do

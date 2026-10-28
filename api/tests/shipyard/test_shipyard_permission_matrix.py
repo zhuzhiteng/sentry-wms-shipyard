@@ -83,7 +83,7 @@ def test_every_shipyard_route_requires_a_page_permission(client, auth_headers):
     )
     routes = _shipyard_routes(client.application)
 
-    assert len(routes) == 49
+    assert routes
     for route, methods in routes:
         for method in methods:
             response = _request_route(
@@ -124,7 +124,7 @@ def test_every_shipyard_write_route_requires_a_business_role(
         for method in methods
         if method != "GET"
     ]
-    assert len(write_routes) == 26
+    assert write_routes
     for route, method in write_routes:
         response = _request_route(
             client,

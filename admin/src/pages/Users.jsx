@@ -436,7 +436,7 @@ export default function Users() {
           </div>
           <div className="form-group">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <label>Mobile Module Access</label>
+              <label>Field Module Access</label>
               <span style={{ fontSize: 12 }}>
                 <button
                   type="button"

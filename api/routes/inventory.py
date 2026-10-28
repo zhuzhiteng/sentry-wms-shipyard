@@ -4,14 +4,18 @@ Inventory management endpoints: cycle count creation, retrieval, and submission.
 
 import uuid
 
-from flask import Blueprint, g, jsonify, request
+from flask import Blueprint, g, jsonify
 from sqlalchemy import text
 
 from constants import (
-    COUNT_PENDING, COUNT_IN_PROGRESS, COUNT_COMPLETED, COUNT_VARIANCE,
-    ADJ_PENDING, ACTION_COUNT,
+    ACTION_COUNT,
+    ADJ_PENDING,
+    COUNT_COMPLETED,
+    COUNT_IN_PROGRESS,
+    COUNT_PENDING,
+    COUNT_VARIANCE,
 )
-from middleware.auth_middleware import require_auth, check_warehouse_access
+from middleware.auth_middleware import check_warehouse_access, require_auth
 from middleware.db import with_db
 from schemas.cycle_count import CreateCycleCountRequest, SubmitCycleCountRequest
 from services.audit_service import write_audit_log
@@ -151,12 +155,6 @@ def get_cycle_count(count_id):
         {"cid": count_id},
     ).fetchall()
 
-    # Fetch blind count setting
-    show_expected_row = g.db.execute(
-        text("SELECT value FROM app_settings WHERE key = 'count_show_expected'")
-    ).fetchone()
-    show_expected = not show_expected_row or show_expected_row.value != "false"
-
     return jsonify({
         "cycle_count": {
             "count_id": cc.count_id,
@@ -168,7 +166,6 @@ def get_cycle_count(count_id):
             "assigned_to": cc.assigned_to,
             "created_at": cc.created_at.isoformat() if cc.created_at else None,
         },
-        "show_expected": show_expected,
         "lines": [
             {
                 "count_line_id": l.count_line_id,
@@ -267,7 +264,7 @@ def submit_cycle_count(validated):
                 ),
                 {"cid": count_id, "iid": item_id, "qty": counted_qty, "user": username},
             )
-            new_cl_id = new_line.fetchone()[0]
+            new_line.fetchone()
 
             lines_with_variance += 1
             reason_detail = f"Cycle count unexpected item: counted {counted_qty} (not in snapshot)"

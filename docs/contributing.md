@@ -1,97 +1,46 @@
-# Contributing
+# 贡献指南
 
-Thanks for your interest in contributing to Sentry WMS.
+## 开发环境
 
-## Dev Environment Setup
-
-```bash
-git clone https://github.com/hightower-systems/sentry-wms.git
-cd sentry-wms
-cp .env.example .env
-docker compose up -d
+```powershell
+Copy-Item .env.example .env
+docker compose up -d --build
 ```
 
-This starts PostgreSQL, the Flask API, and the React admin panel. The API runs on port 5000, admin on port 8080 (nginx-served production build). Add the `docker-compose.dev.yml` overlay to get the Vite dev-server on port 3000 with hot reload.
+管理端热更新：
 
-For mobile development:
-
-```bash
-cd mobile
-npm install
-npx expo start --clear
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
-## Running Tests
+## 验证
 
-```bash
-docker compose exec api python -m pytest tests/ -x -q
+所有测试必须使用独立测试库：
+
+```powershell
+docker exec sentry-api sh -c 'export TEST_DATABASE_URL="${DATABASE_URL%/*}/sentry_test"; python -m pytest tests/ -q'
 ```
 
-307 tests using transaction rollback isolation (savepoint per test, rollback after). Zero regressions required before merging.
+提交前至少执行：
 
-## Workflow
+- 船厂定向 pytest；
+- 后端全量 pytest；
+- 管理端测试和生产构建；
+- 小程序测试；
+- Ruff、Bandit、`pip-audit`、`npm audit`；
+- `git diff --check` 和 gitleaks。
 
-1. Fork the repository
-2. Clone your fork: `git clone https://github.com/YOUR-USERNAME/sentry-wms.git`
-3. Create a feature branch: `git checkout -b feature/your-feature-name`
-4. Make your changes
-5. Run the full test suite
-6. Commit with a clear message
-7. Push to your fork: `git push origin feature/your-feature-name`
-8. Open a Pull Request against `main`
+## 规则
 
-## Commit Messages
+- 现场入口只保留微信小程序；
+- 吊牌只拍照，不新增二维码、条码或扫码枪链路；
+- OCR 结果不得直接写库存，必须经过服务端校验和人工确认；
+- 库存写入必须幂等并带审计记录；
+- 不提交密钥、令牌、客户敏感信息、照片、数据库或构建产物；
+- 提交信息使用 Conventional Commits。
 
-Use [Conventional Commits](https://www.conventionalcommits.org/) with lowercase, present tense:
+## 交付
 
-| Prefix | Use |
-|--------|-----|
-| `feat:` | New feature or capability |
-| `fix:` | Bug fix |
-| `security:` | Security fix |
-| `refactor:` | Code change that doesn't fix a bug or add a feature |
-| `test:` | Adding or updating tests |
-| `docs:` | Documentation only |
-| `chore:` | Build, CI, deps, formatting |
-| `perf:` | Performance improvement |
-
-Examples:
-
-- `feat: add netsuite connector scaffold`
-- `fix: scan input losing focus on pack screen`
-- `security: add warehouse access check to shipping endpoint`
-
-## Code Style
-
-- **Python (API):** PEP 8. Type hints where practical. All SQL must use parameterized bindings -- no f-strings or string concatenation in queries.
-- **JavaScript (Mobile/Admin):** Prettier defaults.
-- **SQL:** Lowercase keywords, snake_case table and column names.
-- **Status values:** Use constants from `api/constants.py` -- never hardcode status strings like `'OPEN'` or `'PICKED'`.
-- **No em dashes.** Use hyphens (`-`) or double hyphens (`--`) only.
-
-## Architecture Patterns
-
-- **Service layer** - business logic lives in `api/services/` (inventory_service, picking_service, audit_service, auth_service)
-- **`@with_db` decorator** - provides `g.db` session for the duration of a request; routes call `g.db.commit()` explicitly for writes
-- **`@require_auth`** - JWT validation with live database check on every request (role, warehouse access, active status)
-- **`check_warehouse_access()`** - call after loading a resource to verify the user is authorized for that resource's warehouse
-
-## Pull Request Requirements
-
-- All existing tests must pass
-- New features should include tests
-- One feature per PR -- keep them focused
-- Update relevant documentation
-
-## Reporting Issues
-
-Open an [issue on GitHub](https://github.com/hightower-systems/sentry-wms/issues) with:
-
-- What you expected to happen
-- What actually happened
-- Steps to reproduce
-- Device/environment info (if mobile-related)
-
-## License
-
-By contributing, you agree that your contributions will be licensed under the Apache License, Version 2.0.
+业务分支使用 `codex/` 前缀。同一交付项保持一个规范分支和一个 PR；只有测试、
+迁移、文档和风险状态均核验后才推进 `main`。真实 OCR、微信真机、UAT 或部署
+未完成时，交付说明必须明确标记生产 `NO-GO`。

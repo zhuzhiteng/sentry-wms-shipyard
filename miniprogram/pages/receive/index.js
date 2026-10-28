@@ -6,7 +6,7 @@ const {
   validateReceiptDraft,
 } = require('../../utils/receipt');
 const { request, upload } = require('../../utils/request');
-const { normalizeSuffix } = require('../../utils/scan');
+const { normalizeSuffix } = require('../../utils/pallet');
 const { requireSession } = require('../../utils/session');
 
 const STATUS_LABELS = {

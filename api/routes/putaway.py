@@ -5,15 +5,15 @@ and preferred bin management.
 
 import uuid
 
-from flask import Blueprint, g, jsonify, request
+from flask import Blueprint, g, jsonify
 from sqlalchemy import bindparam, text
 
-from middleware.auth_middleware import require_auth, check_warehouse_access
+from constants import ACTION_PUTAWAY, BIN_PICKABLE, BIN_PICKABLE_STAGING, BIN_STAGING
+from middleware.auth_middleware import check_warehouse_access, require_auth
 from middleware.db import with_db
 from schemas.putaway import ConfirmPutawayRequest, UpdatePreferredRequest
 from services.audit_service import write_audit_log
 from services.inventory_service import move_inventory
-from constants import ACTION_PUTAWAY, BIN_PICKABLE, BIN_STAGING, BIN_PICKABLE_STAGING
 from utils.validation import validate_body
 
 putaway_bp = Blueprint("putaway", __name__)
@@ -30,8 +30,6 @@ def pending_putaway(warehouse_id):
     # Putaway sources include both pure Staging bins and PickableStaging
     # bins -- the latter serve receive flows that stage trays before
     # putaway while remaining Pickable for sales-pick concurrency.
-    # Mirrors the receive screen's set in mobile/src/screens/ReceiveScreen.js.
-    #
     # suggested_bin: priority-1 preferred_bins entry within the same
     # warehouse, falling back to items.default_bin_id (also constrained
     # to this warehouse). Mirrors the single-item /suggest/<item_id>

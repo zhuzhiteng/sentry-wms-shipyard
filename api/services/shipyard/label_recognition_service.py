@@ -183,8 +183,7 @@ def fields_scan_view(fields: dict[str, Any], *, suffix: str):
             label_quantity = None
     return SimpleNamespace(
         tag_suffix=suffix,
-        qr_payload=None,
-        qr_pallet_no=fields.get("factory_pallet_no"),
+        factory_pallet_no=fields.get("factory_pallet_no"),
         ship_no=fields.get("ship_no"),
         engineering_no=fields.get("engineering_no"),
         production_drawing_no=fields.get("production_drawing_no"),

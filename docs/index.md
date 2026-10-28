@@ -1,142 +1,66 @@
-# Sentry WMS
+# 船厂仓储管理系统
 
-Sentry WMS is a free, open-source warehouse management system built for e-commerce fulfillment.
+本仓库以 Sentry WMS v1.37.0 为技术基座，交付船厂到货清单、吊牌拍照识别、
+整票多托收货、缺件补货、正式出库、库存扣减和装车确认闭环。
 
-It connects barcode scans, pick tasks, and inventory movements to whatever database or ERP your business runs on. Sentry handles the physical warehouse execution layer -- receiving, storage, picking, packing, shipping, and counting -- so your system of record stays accurate.
+## 首期范围
 
-## Features
+- 船号、工程号、制作图绑定；
+- 一级/二级仓库区域和船号定置；
+- 固定模板到货清单与正式出库清单导入；
+- 物料编码、品名、规格的强校验；
+- 微信小程序逐托拍摄吊牌、公网 OCR、原图留证；
+- 整票多托吊牌后缀（`1-1`、`1-2`）识别与齐套校验；
+- 少件按实收入库、原批次补货和库存流水；
+- 正式出库任务、整票库存扣减、装车确认；
+- 仓库隔离、页面权限、业务角色和审计。
 
-- **Receiving** -- scan PO barcodes, verify items, stage for put-away
-- **Put-Away** -- suggested bin placement with preferred bin priorities, scan-to-confirm storage
-- **Pick Walk** -- multi-order batch picking with serpentine walk path optimization
-- **Pack Verification** -- scan-to-verify pack station with item-by-item confirmation
-- **Shipping** -- carrier and tracking entry, fulfillment recording
-- **Cycle Counting** -- bin-level counts with variance detection and admin approval workflow
-- **Bin-to-Bin Transfer** -- move inventory between locations with audit trail
-- **Inter-Warehouse Transfer** -- cross-warehouse inventory moves
-- **Inventory Adjustments** -- direct add/remove with reason tracking
-- **Barcode Lookup** -- scan any barcode from the home screen to identify items, bins, POs, or SOs
-- **Connector Framework** -- pluggable ERP / commerce sync with encrypted credential vault, sync-health dashboard, rate limiting, and circuit breaker
-- **Admin Panel** -- React web app for warehouse managers to monitor operations and configure the system
+## 明确不做
 
-## Stack
+- 现场不使用二维码、条码或扫码设备；
+- 不解析船厂定制二维码，也不维护制码规则；
+- 不保留 Expo / React Native 现场端，唯一现场端是微信小程序；
+- 不实现配送需求、派工单、前置仓发货单三段链路；
+- 首期不维护货架坐标、BOM 或财务结算。
 
-| Layer | Technology |
-|-------|-----------|
-| Mobile App | React Native (Expo) |
-| API | Python / Flask |
-| Database | PostgreSQL 16 |
-| Admin Panel | React 18 / Vite |
-| Infrastructure | Docker Compose |
+吊牌拍照是同一次业务动作：原图用于留证，同时提交公网 OCR 识别吊牌字段。
+识别结果必须经过服务端字段校验和人工确认，不能直接改库存。
 
-## Quick Start
+## 技术结构
 
-```bash
-git clone https://github.com/hightower-systems/sentry-wms.git
-cd sentry-wms
-cp .env.example .env
-# Set every required secret inside .env (JWT_SECRET, SENTRY_ENCRYPTION_KEY,
-# REDIS_PASSWORD). See the comments in .env.example for generation commands.
-docker compose up -d
+| 层 | 技术 |
+|---|---|
+| 管理端 | React 19 / Vite |
+| API | Python 3.11 / Flask |
+| 数据库 | PostgreSQL 16 |
+| 现场端 | 原生微信小程序 |
+| 部署 | Docker Compose |
+
+## 本地启动
+
+```powershell
+Copy-Item .env.example .env
+docker compose up -d --build
 ```
 
-- API: [http://localhost:5000](http://localhost:5000)
-- Admin panel: [http://localhost:8080](http://localhost:8080)
-- Health check: [http://localhost:5000/api/health](http://localhost:5000/api/health)
+- 管理端：`http://localhost:8080`
+- API 健康检查：`http://localhost:5000/api/health`
+- 测试库：`sentry_test`
 
-Fresh installs seed the admin user as `admin` / `admin` with a forced password change on first login. Set `ADMIN_PASSWORD` in your `.env` to skip the forced-change flow; the seed prints that value in the logs:
+首次启动按 `.env` 中配置创建管理员。正式环境必须更换全部示例密钥并启用 HTTPS。
 
-```bash
-docker compose logs db | grep "Admin password"
-```
+## 文档
 
-For local development with Vite dev-server and hot reload, layer on the
-dev overlay:
+- [基线与验证](shipyard/baseline.md)
+- [到货清单](shipyard/inbound-api.md)
+- [拍照识别收货](shipyard/receipt-api.md)
+- [正式出库与装车](shipyard/formal-outbound-api.md)
+- [风险台账](shipyard/risk-register.md)
+- [部署](deployment.md)
+- [测试手册](test-lab.md)
+- [贡献指南](contributing.md)
 
-```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up
-```
+## 当前状态
 
-## Documentation
-
-- [API Reference](api-reference.md) -- every endpoint with request/response examples
-- [Deployment](deployment.md) -- Docker setup, production config, mobile app
-- [Admin Panel](admin-panel.md) -- page-by-page guide to the web admin
-- [Test Lab](test-lab.md) -- setting up a test environment with hardware scanners
-- [Contributing](contributing.md) -- how to set up the dev environment and submit PRs
-
-## Current Version
-
-v1.37.0 -- Sales orders open in place. The Backorders, Dashboard, RMA and Refunds pages now mount the sales-order modal directly, so a row opens where you are instead of sending you to Sales Orders to search for it; the modal moves into its own component and the page drops from about 2,300 lines to 150. A related-records tab walks an order's family in both directions, depth-capped so a corrupt parent chain terminates. Admin tables stop keying rows by array position, which had let a cell's state follow the wrong record when a row above it was removed, and text selection inside a cell no longer fires the row handler. No migrations; no mobile changes, the build stays at 1.36.0 (versionCode 13). See the [v1.37.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.37.0).
-
-v1.36.0 -- Backorders, Admin Ship, wave-create at scale. POS checkout can create a backorder for an item with no stock, landing it at WAITING_STOCK against a warehouse named by the new `BACKORDER_WAREHOUSE_CODE` setting. Backorders now release on any inventory increase rather than only a PO receipt, since the matcher moved out of receiving into the inventory service and every path that raises on-hand calls it. The backorder queue shows item names and a derived open-PO indicator. Admin Ship hand-stamps shipped quantity for an order that shipped without Sentry recording it, refusing returns and refusing a silently under-picked line until acknowledged. Wave-create no longer times out past twenty orders, and the adjustments list no longer 500s on a warehouse that has had a cycle count. Migration 081 (documentation only); mobile moves to version 1.36.0 (versionCode 13). See the [v1.36.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.36.0).
-
-v1.35.0 -- Inventory rows retained at zero. Five mutation paths used to delete an inventory row when a bin emptied, while picking, receiving reversal and cycle-count approval kept it at 0, so an (item, bin) pair could vanish from the snapshot and consumers could not tell "went to zero" from "never tracked". A shared `set_inventory_quantity()` helper now always updates in place across bin transfer, inter-warehouse transfer, direct adjustment, CSV adjustment import and inbound inventory-set; rows are removed only when their item or bin is deleted. The snapshot therefore contains zero-quantity rows it previously omitted, and the fix is forward-only. No migrations; no mobile changes, the build stays at 1.33.0 (versionCode 12). See the [v1.35.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.35.0).
-
-v1.34.0 -- Picking views and fulfillment gating. Picking Tickets gains a Multi-Orders toggle that clusters orders sharing a shipping address so they can be boxed together, and a Long Orders toggle that keeps only orders with more than four lines; the two compose. The printed SHIP WITH banner is now recipient-aware (two customers at one address no longer group) and opt-in (a plain Print All no longer stamps it). Fulfillment actions are allowed on every order type except returns, so replacement and exchange children can be partially fulfilled, admin-picked and released, and returns are blocked server-side rather than only hidden in the UI. POS checkout accepts an order memo, and the Sell (POS) grant appears in the user editor. No migrations; no mobile changes, the build stays at 1.33.0 (versionCode 12). See the [v1.34.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.34.0).
-
-v1.33.0 -- Manufacturer part number and a cycle-count duplicate guard. Migration 079 adds `items.mpn` alongside SKU and UPC, nullable and not unique, surfaced through the item and purchasing APIs and shown on the Items, Purchase Order and Receiving views; item search matches on it like UPC. A double-submitted cycle count could re-INSERT its unexpected lines and double-count on-hand at approval; the submit now locks the count row, the write is idempotent per item, and migration 080 adds `UNIQUE(count_id, item_id)` as the backstop, with the mobile submit button disabled while in flight. Migration 080 fails on a database that already holds duplicate lines and must be cleaned first. Mobile moves to version 1.33.0 (versionCode 12). See the [v1.33.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.33.0).
-
-v1.32.0 -- Receiving performance and customer email. The handheld receive screen pages its line list 50 at a time instead of rendering and re-rendering every row on each scan, so a 700-line PO no longer stutters in proportion to its size. Migration 077 adds a composite `(po_id, item_id)` index so the per-item line lookup stops scanning the whole PO, and receiving-bin validation is memoized. Migration 078 adds `sales_orders.customer_email`, so an address captured at POS checkout persists onto the order, shows in the sales-order modal, and can be mapped from an inbound payload. Mobile moves to version 1.32.0 (versionCode 11). See the [v1.32.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.32.0).
-
-v1.31.0 -- Returns void plus fulfillment fixes. A return SO created by mistake can be soft-deleted (ADMIN-only, gated to OPEN un-received returns with no linked refund); the row and its audit trail persist while the list hides it (migration 076). The RMA disposition bin becomes a searchable field instead of a 500-row dropdown that auto-selected whichever bin sorted first. A transfer order now auto-submits when its pick batch completes rather than stranding at PARTIALLY_PICKED and deadlocking the handheld, and the actual ship method is persisted on the sales-order header. CI gains a per-advisory npm audit allowlist, and the outstanding advisories across all three dependency trees are cleared. No mobile source changes; the build stays at 1.29.0 (versionCode 10). See the [v1.31.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.31.0).
-
-v1.30.0 -- Channel availability (Pipe C). A new outbound surface publishes per-channel sellable availability (`on_hand - allocated`, sellable bins only) to a configured HTTP sink per channel. The `connector-publisher` daemon reconciles each channel against live inventory and debounce-publishes only the rows whose number actually changed, so a busy warehouse does not fan every stock tick out to every marketplace, and because it reads live inventory rather than replaying events it stays truthful even for allocation changes that emit no event. Per-channel SKU scope, a declarative transform, and a new admin Channels page. Migration 075; new `sentry_publisher` role and `connector-publisher` service. No mobile changes; the build stays at 1.29.0 (versionCode 10). See the [v1.30.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.30.0).
-
-v1.29.1 -- Production fixes. The login rate-limiter keyed the lockout on the remote IP alone, so behind a shared NAT egress one person's five failed logins returned HTTP 429 to everyone behind that IP for 15 minutes; it is now keyed on `(IP, username)`. And the Sales Order detail surfaced `ship_method` verbatim, so an order that shipped on a different carrier read misleadingly above its tracking number; the Ship Method line now appends the carrier derived from the tracking-number format when it disagrees ("USPS Ground Advantage (shipped UPS)"), display-only. No migrations; no mobile changes; the build stays at 1.29.0 (versionCode 10). See the [v1.29.1 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.29.1).
-
-v1.29.0 -- Turbo receiving. The handheld receive screen no longer blocks on a full round-trip per scan: each scan counts instantly against an optimistic local total and is buffered, with batches flushing to the receive endpoint in the background (debounced or at a size cap), so scanning is continuous. Counts reconcile from each batch response; a failed batch rolls back its optimistic counts and refetches server truth, and leaving a PO drains the queue first so no scan is lost. The receive handler is tuned alongside it -- resolving the PO and user external-ids once per request, memoizing item resolves, and deferring the audit-log writes to just before commit so the audit-chain lock is held for a shorter window. This is the first mobile/ change since 1.19.0; the mobile build moves to version 1.29.0, versionCode 10, and the APK is rebuilt to ship it. See the [v1.29.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.29.0).
-
-v1.28.0 -- Local pickup and refund status. A new Local Pickup dashboard tab lists local-pickup sales orders (ship method matching "local" or "pickup"), searchable and status-filterable, with a per-row "Picked Up?" that ships a PICKED/PACKED order (tracking waived) and an "Open + Picked" worklist view; `GET /admin/sales-orders` gains an opt-in `local_pickup` filter and a comma-separated status filter. A distinct `REFUNDED` sales-order status now reads apart from plain cancellations: a full POS refund lands the original in REFUNDED instead of CANCELLED (superseding v1.22.0), excluded from the "need to ship today" count and tracked as its own KPI, and migration 074 relabels existing CANCELLED-refund rows. Returns gain an operator memo (stored in the existing `memo` column) and are kept out of the picking queue at the query level. No mobile changes; the build stays at 1.19.0. See the [v1.28.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.28.0).
-
-v1.27.0 -- Cycle-count approvals. The cycle-count approval screen now carries what the system expected, what was scanned, and the resulting variance side by side: `/admin/adjustments/pending` returns `expected_quantity` and `counted_quantity` for each pending adjustment (from the originating cycle_count_line, NULL for non-cycle-count adjustments), and the screen renders Expected / Scanned / Variance columns, sortable by count number or bin. The cycle-count list drops its 200-row cap and fetches every count's lines in one batched query, so the full backlog is reachable. Request timeouts rise (gunicorn 60s -> 180s, nginx 120s -> 300s) so approving a bin with 300+ varianced lines finishes instead of being killed mid-transaction. A high-severity undici advisory is cleared in the mobile lockfile (non-breaking, build tooling only). No migrations; no mobile source changes; the build stays at 1.19.0. See the [v1.27.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.27.0).
-
-v1.26.0 -- POS Activity dashboard. The POS Activity admin page becomes a full operations dashboard: today's KPI counters (sales, revenue, average sale, refunds, active terminals) with an hourly revenue chart, a pace curve against the same hour yesterday, a weekly trend, and channel and tender splits, all anchored by a date selector that scopes the KPIs, the sales-order list, and the analytics to a chosen day. The `/api/admin/pos/summary` endpoint computes the new aggregates in one pass and `/api/admin/pos/sales-orders` gains the matching date and channel filters, both behind the existing `pos-activity` page-permission gate. No migrations; no mobile changes; the build stays at 1.19.0. See the [v1.26.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.26.0).
-
-v1.25.0 -- Inbound editing, performance, and secret scanning. Editing a received purchase-order line's quantity upward reopens it (RECEIVED -> PARTIAL) so an over-receipt becomes receivable, and every admin PO edit (header `PUT`, line add/update/remove) emits `purchaseorderedit.completed/1` with the per-field diff so the ERP can reverse-sync a correction made in Sentry. The inbound line write-through is rebuilt to a constant number of database round-trips -- one batched item resolve, the per-line SKU lookups pre-resolved in one cached batched query, and a single multi-row INSERT -- so a wide PO no longer risks the gunicorn worker timeout mid-write. A gitleaks secret-scanning gate scans the entire git history on every push and pull request, running the pinned binary with an allowlist limited to known-benign test and CI placeholders. No migrations; no mobile changes; the build stays at 1.19.0. See the [v1.25.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.25.0).
-
-v1.24.0 -- Returns, RMA, and exchanges. The post-fulfillment arc, end to end: a sale can spawn typed child orders -- a replacement or exchange outbound, a goods-in RMA to receive returned stock against, a credit-memo refund -- each numbered off its original (`<orig>-REPLACEMENT` / `-EXCHANGE` / `-RMA` / `-REFUND`) and linked via `parent_so_id` / `original_so_line_id`. RMA receiving (`POST /api/admin/sales-orders/<so_id>/receive-return`) books returned goods into a disposition bin and emits `return.received/1`, fronted by a tabbed Returns admin page; POS checkout mints replacement/exchange children off an attached original, and refund accepts a line subset for partial refunds. Migrations 070-073. No mobile changes; the build stays at 1.19.0. This release completes the fork-to-OSS migration. See the [v1.24.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.24.0).
-
-v1.23.0 -- Ship events and operations dashboard. The admin sales-order edit surface emits the outbound events a marketplace consumer needs: editing a header through `PUT /api/admin/sales-orders/<so_id>` fires `salesorderedit.completed/1` with the per-field diff, and a status edit to SHIPPED additionally fires `ship.confirmed/1` (carrier derived from the free-text ship method, empty `tracking_numbers` allowed for a local-pickup ship). The dashboard gains an operations view: a per-PO Received tab (`GET /api/v1/dashboard/received`) and a Marketplace Health tab (`GET /api/v1/dashboard/shipping-health`) with per-channel Orders Received / Orders Shipped totals and a clickable need-to-ship-today bubble that opens the SO drill-down. The channel set is admin-defined in a Settings > Marketplace Health surface that saves `{origin, label}` pairs to the `dashboard_bubble_origins` app setting, matched verbatim against `sales_orders.order_origin`; with nothing configured the view surfaces no channels. No migrations; no mobile changes; the build stays at 1.19.0. See the [v1.23.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.23.0).
-
-v1.22.0 -- POS completions and dockd reads. The POS sale path is rounded out: the payment summary gains `shipping_cents` and checkout an optional `ship_method`, so a phone order persists shipping charge, method, and order total to `sales_orders.customer_shipping_paid` / `ship_method` / `order_total` (credited back as negatives on a full refund); `split` (part cash + part card) is accepted as a tender method; and a full refund now moves the original SO to `status=CANCELLED` so admin and picker views stop showing a refunded sale as SHIPPED. The dockd warehouse-floor integration gains a token-authed `GET /api/v1/dockd/items/<barcode>` (item by barcode + per-location stock, token-scoped) and `qty_ordered` on the order payload, with the OpenAPI spec regenerated to match. No migrations; no mobile changes; the build stays at 1.19.0. See the [v1.22.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.22.0).
-
-v1.21.0 -- Pre-allocation and POS phone orders. Admin-created and marketplace-inbound sales orders reserve inventory at create time -- a greedy, fullest-bin-first `quantity_allocated` walk under `FOR UPDATE` -- so an order no longer sits OPEN with nothing reserved until a picker batches it, closing the window where POS sales and concurrent inbound orders claimed the same on-hand pool; a manual allocation stepper on the SO line table and a picking flow that normalizes already-reserved lines round it out. POS checkout gains a phone-order path: `is_phone_order` creates the SO at `status=OPEN` and reserves each line via `quantity_allocated` instead of decrementing on-hand, captures an optional customer + structured `shipping_address` (persisted to `sales_orders.shipping_address_*` so the picking ticket renders a real label), takes `order_origin` from the wire, and renumbers POS SOs `SO-POS-<n>` -> `POS-<n>`. No migrations; no mobile changes; the build stays at 1.19.0. See the [v1.21.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.21.0).
-
-v1.20.0 -- Inbound sync, event rename, and deploy hardening. A state-based `POST /api/v1/inbound/inventory_update` endpoint takes a desired final on-hand quantity, computes the delta against current stock, and applies it as an idempotent APPROVED adjustment (same target = 0-delta no-op) -- for cutover seed, marketplace mirror, and drift correction. Outbound webhook `*_external_id` fields now carry the source-system identifier the upstream connector pushed (resolved from `cross_system_mappings`), not Sentry's internal canonical UUID, so consumers no longer round-trip the API per event. **BREAKING:** the inventory completion events are renamed to the entity-prefixed names connectors filter on -- `transfer.completed` -> `inventorytransfer.completed` and `adjustment.applied` -> `inventoryadjusted.completed`; payload shapes are unchanged, so migrate by subscribing to the new `event_type`. `cycle_count.adjusted` is kept and now rides alongside `inventoryadjusted.completed` on the cycle-count branch. Deploy portability: `admin/nginx.conf` becomes an `${API_UPSTREAM_*}`-templated config, the api image bakes `db/mappings/` so Pipe B inbound needs no volume mount, and the gunicorn worker timeout rises to 60s. No mobile changes; the build stays at 1.19.0. See the [v1.20.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.20.0).
-
-v1.18.0 -- Backorders, notifications, and dispatcher reliability: a partial-fulfillment workflow ships what's pickable and spins the shortfall into a backorder SO (`status=WAITING_STOCK`) that waits for stock and rejoins the picking queue on its own when a receipt makes it whole, fronted by a `/backorders` dashboard and a "Partially Fulfill" sub-modal; a parent-cancel cascade keeps backorders from being stranded. Per-warehouse Microsoft Teams notifications fire on the `backorder.*` lifecycle (opened / fulfillable / cancelled) through an SSRF-guarded adapter and an opt-in `/notifications` admin surface, with URLs Fernet-encrypted at rest. The outbound webhook dispatcher is hardened against silent head-of-line blocking: dispatch-time DNS moves inside the wall-clock watchdog, a heartbeat reaper reclaims stale `in_flight` rows, permanent failures fast-DLQ instead of burning the full retry schedule, and a self-monitor alerts to Teams. Migrations 067 and 068 back the backorder lifecycle and the notification destinations. No mobile diffs; no new APK. See the [v1.18.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.18.0).
-
-v1.17.0 -- Admin at scale: the admin pages are reworked to hold up at production catalogue size -- server-side search across Inventory, Items, Adjustments, Inventory Transfers, and the Create PO/SO modal, a warehouse/bin filter on Inventory (the endpoint now honors `bin_id` and matches UPC + bin_code), Bins pagination + CSV export, and a Put-Away staging dashboard (new `/putaway/staging-summary` endpoint) that lists every staging bin including empty ones. A POS Activity dashboard surfaces point-of-sale order activity and daily KPIs, gated behind the `pos_activity_enabled` setting so non-POS deployments never see the tab. An Outbound Fraud queue holds an order at FRAUD_REVIEW until a CSR clears it, with the billing != shipping auto-flag heuristic opt-in (`fraud_review_billing_shipping`, off by default). Migration 066 documents the new status value; no DDL. No mobile diffs; no new APK. See the [v1.17.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.17.0).
-
-v1.16.0 -- Admin platform: a Vendors page with CRUD over the canonical vendors table; a consolidation pass that folds Warehouses / Bins / Zones / Preferred Bins under a single Data tab strip, retires the admin Picking/Packing/Shipping mirror pages in favor of the handheld scanner flow (migration 065 prunes the retired page keys), widens the SO/PO detail popups, and adds an Item History tab to the audit log via a new `?item_id` filter; and purchase-order management with editable line items, an ARCHIVED status and status dropdown, CSV export, a debounced Add-Line SKU typeahead, and inline per-line receiving on the web. The picking productivity metric now counts distinct orders rather than summed units. No mobile diffs; no new APK. See the [v1.16.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.16.0).
-
-v1.15.0 -- Admin picking ops: an admin virtual-pick path that marks an OPEN sales order picked from the admin UI (`POST /admin/sales-orders/<id>/admin-pick`, split-bin aware, undoable through Release Picked Quantities), and a printable Picking Tickets queue with per-SO and Print All packing-slip views (Code 128 barcode, warehouse-walk order, Hide-Printed). The packing-slip branding (logo, company name + address, returns text) is Settings-driven with neutral defaults, so a fresh install prints a clean, unbranded slip. Migration 064 adds `printed_at` so the queue hides already-printed orders. No mobile diffs; no new APK. See the [v1.15.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.15.0).
-
-v1.14.0 -- Picking integrity: under-allocation pre-flight at batch creation (HTTP 409 `insufficient_coverage` with an `exclude_so_ids` retry) and line-level fulfillment guards across batch / pack / ship, so a line short-picked without an operator-confirmed SHORT marker can no longer ride the SO through PICKED / PACKED / SHIPPED; a no-Resume pick-batch lifecycle where a new scan full-reverts the operator's prior batch, plus an admin Picking Batches release page; and wave-validate accepting transfer-order scans. First mobile change since v1.10.3 (unpickable-orders modal, Resume removed, transfer-order scans); APK at versionCode 8. No new migrations. See the [v1.14.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.14.0).
-
-v1.13.0 -- SO status revert and editing refinements: a `revert-status` flow that demotes a PICKED / PACKED / SHIPPED order to any earlier status (per-pick_task release, unpack, unship, plus a release-only mode and a shared `full_revert_batch` cancel-batch unwind); a free-text `sales_orders.order_origin` label (mig 063); tracking-number and inline address editing in the SO edit modal; and a `.modal` type-scale pass. `cryptography` 48.0.1 + npm transitive bumps clear the 2026-06-15 audit advisories. No mobile diffs; no new APK. See the [v1.13.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.13.0).
-
-v1.11.0 -- Status simplification: PICKING, PACKING, and ALLOCATED are retired from the SO lifecycle (now OPEN -> PICKED -> PACKED -> SHIPPED, with CANCELLED as the off-ramp). Breaking for automation keying on the retired statuses; the derived signal is a `pick_batch_orders` row whose batch is OPEN or IN_PROGRESS. Migration 060 runs the backfill. No mobile diffs; no new APK. See the [v1.11.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.11.0).
-
-v1.10.4 -- API-reliability patch: POS cash tenders accept a null processor reference (cash carries no card-processor session or marketplace_txn_id; dedup rides `idempotency_key`); pooled DB connections are validated before use (`pool_pre_ping` + `pool_recycle`), eliminating first-request-after-idle 500s; SO detail returns `customer_phone` + `customer_address` so saved values survive the edit-modal round-trip. No migrations. No new APK; the v1.10.3 APK (versionCode 7) remains the working baseline. See the [v1.10.4 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.10.4).
-
-v1.10.3 -- Floor-operations patch: PickableStaging bins become valid put-away sources (pending queue plus handheld bin-scan / item-scan, matching the receive screen), and receipt cancel requires `po_id`, refusing cross-PO sweeps with a pre-flight mismatch check before any state is touched. Mobile moves to versionCode 7; no standalone v1.10.3 APK is published -- the handheld half of the put-away fix ships in the next APK build, which covers everything since the v1.9.0 baseline. See the [v1.10.3 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.10.3).
-
-v1.10.2 -- Security catch-up + data integrity: dependency bumps across all three trees with documented pip-audit deferrals; the audit hash chain handles multi-line payloads (mig 057, historical `row_hash` values still verify); line-level pick FKs move to ON DELETE SET NULL (migs 058, 059). No new APK. See the [v1.10.2 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.10.2).
-
-v1.10.1 -- Patch release on top of the v1.10.0 POS surface. Two operator-experience changes: the admin token validator (`CreateTokenRequest` / `UpdateTokenRequest`) now accepts the `dockd.dispatch` and `pos.dispatch` slugs (pre-fix returned 400 `unknown_endpoint_slugs` on either, blocking operators from issuing dockd or POS tokens through the admin API); and the admin Imports page gains an "Inventory Adjustments" tab for bulk on-hand corrections via CSV (`sku`, `warehouse`, `bin`, `qty` signed integer, `memo` optional). Each accepted row writes an `inventory_adjustments` row with `reason_code='CORRECTION'`, `status='APPROVED'` so the on-hand change applies inline; positive qty goes through `services.inventory_service.add_inventory` (advisory-locked), negative qty takes `FOR UPDATE` on the inventory row and rejects when available on-hand is insufficient. One `audit_log` (`ACTION_ADJUST`) and one `adjustment.applied/1` outbox event fire per accepted row. No migrations. No new APK; v1.9.0 APK remains the working baseline. See the [v1.10.1 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.10.1).
-
-v1.10.0 -- POS endpoint surface. Sentry serves a dedicated counter-sale API for an external POS Service: four endpoints under `/api/v1/pos/` (`GET /availability`, `POST /validate-cart`, `POST /checkout`, `POST /refund`) authenticated by a new fourth direction `pos.dispatch` alongside outbound polling, inbound POST, and dockd. Checkout and refund are atomic single-transaction routes with `SELECT ... FOR UPDATE` on the inventory rows being decremented or re-incremented, idempotent on a per-route `idempotency_key` (UUID4) with a SHA-256 body hash so a retry with the same key + same body replays the cached response and a retry with the same key + different body returns 409. Refund enforces a 90-day window from the original sale's `created_at`, a card-vs-cash tender lock, and a once-per-original-SO guard via `refunded_at` / `refund_so_id` on the original `sales_orders` row. PCI-scope guard at the Pydantic boundary: card tenders accept exactly `{type, amount_cents, card_brand, card_last4, auth_code, external_ref}`; any other field fails 422. Pricing stays out of Sentry: per-line cents ride on the wire and land in `audit_log.details`; the POS Service owns its own pricing source. New `ACTION_POS_CHECKOUT` + `ACTION_POS_REFUND` audit constants. One migration (056). No new APK; v1.9.0 APK remains the working baseline since v1.10 adds no mobile changes. See the [v1.10.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.10.0).
-
-v1.9.0 -- Dockd shipping integration. Sentry serves a dedicated outbound shipping API for the in-warehouse dockd application: three endpoints under `/api/v1/dockd/orders/<so_number>` (GET, ship, void-ship) authenticated by per-station bearer tokens with the new `dockd.dispatch` scope, idempotent under retry through SHA-256 body-hash sentinel rows, and serialized against concurrent shipment via `SELECT ... FOR UPDATE` on the SO. Both ship and void-ship write through the existing audit-log hash chain and emit on the `integration_events` outbox; the new `ship.voided/1` event reverts a SHIPPED SO back to PICKED or PACKED. The SO lifecycle gains `CANCELLED` status with end-to-end wiring (admin + inbound + dashboard counter); a new `sales_orders.memo` column flows from connector through the picker / packer / shipper screens; the admin Audit Log page is modernized with color-coded action badges, chip-style detail previews, and a Copy JSON button. PICK / TO_LINE_PICKED / PACK / RECEIVE audit details now record both expected and actual counts. Two migrations (054-055). v1.9 APK published (`sentry-wms-v1.9.0.apk`) for the new memo display and the pack-after-short-pick fix; v1.8 APK remains a working baseline. See the [v1.9.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.9.0).
-
-v1.8.0 -- Transfer Orders + Productivity Dashboard. Sentry's first internal warehouse-to-warehouse workflow: import a TO via CSV (with shortage detection), pick through the existing mobile flow via a new `pick_tasks.to_id` discriminator, batch picks into an admin-approval row, approve to move inventory source -> destination + emit `transfer.completed/1`, or reject for re-pick. The operations-overview Dashboard is replaced with a per-user productivity grid (Picking units / Packing units / Shipped orders / Received unique SKUs / Put Away unique SKUs) backed by `audit_log` aggregation through a new compound covering index. Inbound contract gains `sales_orders.order_total` + `customer_shipping_paid` (NUMERIC(12,2) with per-field decimal bounds), structured 16-column billing + shipping addresses (drops v1.7's two TEXT placeholders), inbound line items write through to `purchase_order_lines` + `sales_order_lines`, per-token static `mapping_overrides` JSONB, and a `warehouse_id` token fallback. Five migrations (049-053). Three security carry-forwards close the v1.4 deferral set. See the [v1.8.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.8.0).
-
-v1.7.0 -- Inbound (Pipe B). External systems can now POST canonical-shaped resource updates to Sentry through five new endpoints under `/api/v1/inbound/` (sales_orders, items, customers, vendors, purchase_orders). Each request carries `external_id` + `external_version` + `source_payload`; per-source mapping documents (YAML at `db/mappings/<source_system>.yaml`) translate the payload into Sentry's canonical model with strict-typed Pydantic validation, JSONPath resolution, simpleeval-sandboxed derived expressions, and `cross_system_lookup` for canonical UUID resolution against prior ingestions. `X-WMS-Token` gains `source_system` + `inbound_resources` scope dimensions; `inbound_source_systems_allowlist` gates which source systems can POST. Twelve new migrations (037-048). One new env var (`SENTRY_INBOUND_SOURCE_PAYLOAD_RETENTION_DAYS`); two existing env vars gain new shape (`SENTRY_INBOUND_MAX_BODY_KB` boot-validated, `SENTRY_INBOUND_MAPPINGS_DIR` default changed to absolute `/db/mappings`). audit_log chain integrity hardened against concurrent insert via sentinel-lock + nextval-in-trigger (#271). Direct-DB revoke of `wms_tokens.revoked_at` now propagates auth invalidation across workers (#274, #278). License changed from MIT to Apache 2.0; pre-v1.7.0 tagged releases remain MIT-licensed. See the [v1.7.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.7.0) for migrations, env vars, and operator notes. See the [changelog](changelog.md) and [SECURITY.md](https://github.com/hightower-systems/sentry-wms/blob/main/SECURITY.md).
-
-v1.6.1 -- Webhook Security Patch. Closes 22 findings (V-300 through V-321) from the post-v1.6.0 audit on the new outbound webhook surface: tombstone-gate URL canonicalization, HMAC-signed cross-worker pubsub, secret-rotation race closed via `SELECT FOR SHARE`, replay-batch pre-INSERT ceiling check + cross-subscription throttle, response-body cap + tuple HTTP timeouts with wall-clock watchdog, malformed-filter fail-closed, retry-slot jitter, `webhook_deliveries` DELETE/TRUNCATE forensic triggers, and api-container boot-guard parity with the dispatcher. Three new migrations (034-036). Five new env vars. No API contract changes. See the [v1.6.1 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.6.1) for migrations, env vars, and operator notes.
-
-v1.6.0 -- Outbound Push (Pipe A Write). External systems no longer have to long-poll `integration_events`: a new `sentry-dispatcher` daemon POSTs each visible event to admin-registered consumer URLs over HMAC-signed HTTPS with a 24-hour dual-accept rotation window, exponential-backoff retries, a 1,000-row dead-letter lane, and dispatch-time SSRF guard with DNS-rebinding mitigation. Admin panel gains a Webhooks page (CRUD, secret rotation, DLQ viewer with replay-one + replay-batch, per-subscription stats, cross-subscription error log) and a wired global search bar covering items / bins / POs / SOs / customers (#163, carry-forward from v1.4). See the [v1.6.0 release](https://github.com/hightower-systems/sentry-wms/releases/tag/v1.6.0) for migrations, env vars, and operator notes.
-
-Licensed under Apache 2.0. Built by [Hightower Systems](https://github.com/hightower-systems).
+代码与自动化验证完成不等于生产验收。真实公网 OCR、微信真机、现场吊牌样本和
+船厂 UAT 未完成前，生产状态保持 `NO-GO`。

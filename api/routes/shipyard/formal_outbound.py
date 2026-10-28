@@ -16,7 +16,6 @@ from schemas.shipyard import (
     ConfirmOutboundLoadingRequest,
     ConfirmOutboundManifestRequest,
     ConfirmOutboundTaskRequest,
-    OutboundPalletScanRequest,
     VoidInboundManifestRequest,
 )
 from services.shipyard.errors import OutboundManifestStateError
@@ -39,8 +38,6 @@ from services.shipyard.outbound_turnover_service import (
     get_outbound_photo,
     get_outbound_task_context,
     recognize_outbound_label_photo,
-    save_outbound_task_photo,
-    validate_outbound_pallet_scan,
 )
 from utils.uploads import (
     UnsupportedImageError,
@@ -305,25 +302,6 @@ def get_mobile_outbound_order(outbound_order_id):
     return jsonify(payload)
 
 
-@shipyard_bp.post("/outbound/tasks/<uuid:task_id>/scan")
-@require_auth
-@require_shipyard_roles(*FORMAL_OUTBOUND_MOBILE_ROLES)
-@require_admin_or_page_permission(OUTBOUND_PAGE)
-@validate_body(OutboundPalletScanRequest)
-@with_db
-def scan_outbound_pallet(task_id, validated):
-    context = get_outbound_task_context(g.db, str(task_id))
-    ok, denied = check_warehouse_access(context.warehouse_id)
-    if not ok:
-        return denied
-    payload = validate_outbound_pallet_scan(
-        g.db,
-        task_id=str(task_id),
-        scan=validated,
-    )
-    return jsonify(payload)
-
-
 @shipyard_bp.post("/outbound/tasks/<uuid:task_id>/label-recognition")
 @require_auth
 @require_shipyard_roles(*FORMAL_OUTBOUND_MOBILE_ROLES)
@@ -355,45 +333,6 @@ def recognize_outbound_label(task_id):
         g.db,
         task_id=str(task_id),
         file_name=safe_upload_name(uploaded.filename, fallback="pallet-label"),
-        content_type=content_type,
-        content=content,
-        uploaded_by=g.current_user["username"],
-    )
-    return jsonify(payload), 201
-
-
-@shipyard_bp.post("/outbound/tasks/<uuid:task_id>/photos")
-@require_auth
-@require_shipyard_roles(*FORMAL_OUTBOUND_MOBILE_ROLES)
-@require_admin_or_page_permission(OUTBOUND_PAGE)
-@with_db
-def upload_outbound_task_photo(task_id):
-    if not request.mimetype.startswith("multipart/form-data"):
-        return jsonify(
-            {
-                "error": "unsupported_media_type",
-                "message": "请使用 multipart/form-data 上传照片",
-            }
-        ), 415
-    context = get_outbound_task_context(g.db, str(task_id))
-    ok, denied = check_warehouse_access(context.warehouse_id)
-    if not ok:
-        return denied
-    uploaded = request.files.get("file")
-    if uploaded is None or not uploaded.filename:
-        return jsonify({"error": "file_required"}), 400
-    try:
-        content = read_upload_bytes(uploaded)
-        content_type = detect_image_content_type(content)
-    except UploadTooLargeError as exc:
-        return jsonify({"error": "file_too_large", "message": str(exc)}), 413
-    except UnsupportedImageError as exc:
-        return jsonify({"error": "unsupported_file_type", "message": str(exc)}), 415
-    payload = save_outbound_task_photo(
-        g.db,
-        task_id=str(task_id),
-        tag_suffix=request.form.get("tag_suffix", ""),
-        file_name=safe_upload_name(uploaded.filename, fallback="pallet-photo"),
         content_type=content_type,
         content=content,
         uploaded_by=g.current_user["username"],

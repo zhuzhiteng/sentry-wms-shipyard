@@ -1,6 +1,8 @@
 # API Reference
 
-This document covers the warehouse-floor and admin REST surface (every route prefixed with `/api/`, mostly used by the mobile app and the admin panel). The integration / connector surface lives elsewhere -- see the section below.
+This document covers the retained warehouse and admin REST surface (every route
+prefixed with `/api/`). The current shipyard field client uses `/api/auth` and
+`/api/shipyard`; its workflow is documented under `docs/shipyard/`.
 
 ## Connector / integration surface
 
@@ -855,7 +857,7 @@ curl -X POST http://localhost:5000/api/inventory/cycle-count/create \
 
 ### GET /api/inventory/cycle-count/{count_id}
 
-Get cycle count details. Respects `count_show_expected` setting for blind counts.
+Get cycle count details.
 
 - **Auth required:** Yes
 
@@ -941,7 +943,7 @@ curl -X POST http://localhost:5000/api/transfers/move \
 
 ### GET /api/warehouses/list
 
-List all active warehouses. Used by the mobile app for post-login warehouse selection.
+List all active warehouses. Used by field and admin clients for post-login warehouse selection.
 
 - **Auth required:** Yes
 
@@ -1196,7 +1198,7 @@ Returns: `open_pos`, `pending_receipts`, `items_awaiting_putaway`, `open_sos`, `
 | GET | `/api/admin/settings/{key}` | Get single setting |
 | PUT | `/api/admin/settings` | Update settings (`settings` object with key-value pairs) |
 
-Available settings: `require_packing_before_shipping`, `count_show_expected`, `allow_over_receiving`, `default_receiving_bin`, `require_count_approval_separation`
+Available settings: `require_packing_before_shipping`, `allow_over_receiving`, `default_receiving_bin`, `require_count_approval_separation`
 
 ---
 

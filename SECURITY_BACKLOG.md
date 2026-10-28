@@ -82,33 +82,6 @@ Revisit when:
   Requires coordinated backend + frontend change.
 - **Target version:** v1.4.
 
-### V-047 -- Mobile JWT in AsyncStorage (plaintext)
-- **Severity:** High
-- **Category:** Infrastructure
-- **Description:** React Native app stores the 8-hour JWT in
-  `AsyncStorage`, which is unencrypted SQLite on Android and an
-  unprotected plist on iOS. `expo-secure-store` is already declared as
-  a dependency but never imported.
-- **Suggested fix:** Replace every `AsyncStorage.getItem/setItem` that
-  touches `jwt_token` or `user_data` with `SecureStore.getItemAsync /
-  setItemAsync`. Migrate existing installed clients by falling back to
-  AsyncStorage on first launch then rewriting into SecureStore.
-- **Target version:** v1.4.
-
-### V-048 -- Mobile cleartext HTTP forcibly enabled
-- **Severity:** High
-- **Category:** Infrastructure
-- **Description:** `mobile/app.json` and `mobile/plugins/
-  with-cleartext-traffic.js` unconditionally enable cleartext HTTP in
-  every build profile. CHANGELOG v1.1.0 claimed this was fixed; the
-  fix was reverted in commit `ff36caf` for warehouse-deployment
-  convenience and the changelog was not updated.
-- **Suggested fix:** Gate the plugin on `process.env.EAS_BUILD_PROFILE !==
-  "production"`. Coordinate with the warehouse deployments that
-  actually rely on cleartext (they should migrate to a local TLS
-  reverse proxy instead).
-- **Target version:** v1.4.
-
 ### V-050 -- No Content-Security-Policy header
 - **Severity:** High
 - **Category:** AI-Pattern
@@ -272,8 +245,8 @@ Revisit when:
   user. Combined with V-009's (now closed) SSRF surface, unthrottled
   test_connection was a scanning primitive.
 - **Suggested fix:** Add Flask-Limiter with per-user and per-IP token
-  buckets. Lower limit for connector/test, higher for mobile scan
-  paths.
+  buckets. Lower limit for connector/test, higher for shipyard photo
+  upload and OCR paths.
 - **Target version:** v1.4.
 
 ### V-042 -- No pip-audit / npm-audit in CI
@@ -380,9 +353,7 @@ Revisit when:
 | V-037 | `int()` in CSV import -> 500 on non-numeric (now closed by V-015) | Done |
 | V-038 | No per-endpoint body-size caps | Set per-route `MAX_CONTENT_LENGTH` |
 | V-039 | Username case-normalization mismatch between DB lookup and lockout key | Decide on case-sensitivity policy and normalize in one place |
-| V-043 | Default CORS_ORIGINS includes Metro dev server (:8081) | Remove from production defaults |
 | V-044 | `users.is_active DEFAULT TRUE` | Change default to FALSE; require explicit activation |
-| V-049 | Hardcoded internal IP in mobile preview APK | Parameterize via build-time secret |
 | V-052 | N+1 queries in admin dashboard endpoint | Convert to JOINs |
 | V-061 | `user_id` mixed int/string across audit log callers | Standardize on username (VARCHAR) or user_id (INT) with schema change |
 | V-064 | Flask-CORS does not explicitly reject `Origin: null` | Add explicit denylist |
@@ -393,7 +364,6 @@ Revisit when:
 | V-071 | Containers have no `cap_drop` / `read_only` / `security_opt` | Add to prod compose |
 | V-073 | `review_adjustments` silently skips invalid decisions | Return per-decision detail |
 | V-074 | `direct_adjustment` bypasses approval | Add opt-in setting `require_direct_adjustment_approval` |
-| V-075 | Mobile global 401 interceptor force-logs-out | Restrict to whitelist endpoints |
 | V-076 | Only 500 handler is consolidated | Add matching handlers for 4xx if observability needs |
 | V-077 | Test JWT secret hardcoded in conftest (closed cosmetically) | Rotate per-run via `secrets.token_hex(32)` |
 

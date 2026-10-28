@@ -1,150 +1,62 @@
-# Test Lab Setup
+# 船厂仓储测试手册
 
-How to set up a small-scale test environment to exercise all warehouse flows end to end.
+## 环境
 
-## Hardware
+- 管理端：现代浏览器；
+- 现场端：微信开发者工具和至少一台真机；
+- 服务端：Docker Compose；
+- 测试库：独立 `sentry_test`，禁止指向生产库；
+- OCR：测试默认使用固定识别结果，现场 UAT 使用已获授权的公网 OCR。
 
-- **Scanner** - Chainway C6000 (or any Android device with Expo Go for dev testing)
-- **Label printer** - Zebra ZD421 or similar (optional -- you can print barcodes on paper)
-- **Barcode labels** - item UPCs, bin barcodes, PO/SO barcodes
+现场不测试二维码、条码或扫码枪。每个托盘拍一张吊牌原图，系统用同一张图完成
+OCR 识别和留证。
 
-## Network
+## 自动化验证
 
-- All devices on the same local network (WiFi)
-- API server running on a machine with a known IP address
-- Mobile app connects to `http://<server-ip>:5000`
-
-## Getting Started
-
-### 1. Start Fresh
-
-```bash
-cd sentry-wms
-docker compose down -v
-docker compose up -d
+```powershell
+docker exec sentry-api sh -c 'export TEST_DATABASE_URL="${DATABASE_URL%/*}/sentry_test"; python -m pytest tests/shipyard tests/test_087_shipyard_label_ocr_migration.py tests/test_088_shipyard_remove_legacy_qr_migration.py tests/test_089_shipyard_remove_distribution_dispatch_migration.py -q'
 ```
 
-This resets the database and loads demo data (20 items, 16 bins, 5 POs, 20 SOs).
-
-### 2. Log In to Admin Panel
-
-Open `http://<server-ip>:8080` in a browser. Fresh installs seed the admin user as `admin` / `admin`; you are forced to change the password on first login.
-
-If you set `ADMIN_PASSWORD` in your `.env`, the seed uses that value instead and skips the forced-change flow -- `docker compose logs db | grep "Admin password"` prints it for you.
-
-### 3. Install the Mobile App
-
-Either sideload the APK via `adb install` or use Expo Go for development:
-
-```bash
-cd mobile
-npm install
-npx expo start --clear
+```powershell
+Set-Location miniprogram
+npm test
 ```
 
-On first launch, enter the server URL (`http://<server-ip>:5000`) and log in.
+管理端应在干净 Node 环境执行：
 
----
-
-## Test Flow Walkthrough
-
-### Step 1: Receive a Purchase Order
-
-1. In the admin panel, go to Settings and create a PO (or use one of the 5 demo POs)
-2. On the mobile app, tap **RECEIVE**
-3. Scan the PO barcode (or type the PO number)
-4. The PO loads with expected line items
-5. Scan each item barcode to receive it -- quantity increments per scan in Turbo mode
-6. Select a staging bin if prompted
-7. Submit the receipt
-
-Verify in the admin panel: PO status updates to PARTIAL or RECEIVED.
-
-### Step 2: Put Away Items
-
-1. On mobile, tap **PUT-AWAY**
-2. The pending items list shows everything in staging bins
-3. Tap an item or scan its barcode
-4. The app suggests a preferred bin (or default bin)
-5. Scan the destination bin barcode to confirm
-6. Enter quantity and confirm
-
-Verify: item moves from staging to the storage bin in the Inventory page.
-
-### Step 3: Create a Sales Order
-
-1. In the admin panel, go to Settings and create an SO with line items
-2. Or use one of the 20 demo SOs
-
-### Step 4: Pick Walk
-
-1. On mobile, tap **PICK**
-2. Scan SO barcodes to add orders to the wave (the app validates each one)
-3. Tap "Create Batch" to start the pick walk
-4. The app shows the first pick task with bin location, item, and quantity
-5. Walk to the bin, scan the item barcode to confirm
-6. Continue until all tasks are complete
-7. Submit the batch
-
-Verify: SO status changes to PICKED.
-
-### Step 5: Pack Verification
-
-1. On mobile, tap **PACK**
-2. Scan the SO barcode to load the order
-3. Scan each item barcode to verify it matches the pick list
-4. The progress bar shows verified vs total items
-5. When all items are verified, tap Complete
-
-Verify: SO status changes to PACKED.
-
-### Step 6: Ship
-
-1. On mobile, tap **SHIP**
-2. Scan the SO barcode
-3. Select a carrier and enter a tracking number
-4. Tap Ship
-
-Verify: SO status changes to SHIPPED. Fulfillment records appear in the admin panel.
-
-### Step 7: Cycle Count
-
-1. In the admin panel, go to Cycle Counts and create a count for one or more bins
-2. On mobile, tap **COUNT**
-3. Scan the bin barcode to load the count
-4. Enter the physical quantity for each item
-5. Submit the count
-6. If variances exist, approve or reject adjustments in the admin panel under Cycle Count Approvals
-
-### Step 8: Transfer
-
-1. On mobile, tap **TRANSFER**
-2. Scan the item barcode
-3. Scan the source bin (FROM)
-4. Scan the destination bin (TO)
-5. Enter quantity and confirm
-
----
-
-## Demo Seed Data
-
-The default seed (`db/seed-apartment-lab.sql`) includes:
-
-- 1 warehouse (APT-LAB) with 6 zones and 16 bins
-- 20 items (fly fishing catalog, TST-001 through TST-020)
-- 5 purchase orders with varying line counts
-- 20 sales orders covering single-item, multi-item, contention, and edge cases
-- Inventory pre-loaded in storage bins
-
-Set `SKIP_SEED=true` to start with an empty warehouse and only the admin user.
-
-## Resetting
-
-To wipe everything and start over:
-
-```bash
-docker compose down -v
-docker compose up -d
+```powershell
+Set-Location admin
+npm ci
+npm test -- --run
+npm run build
+npm audit --audit-level=high
 ```
 
-The `-v` flag removes the PostgreSQL data volume. A fresh seed runs automatically on next startup.
+HTTP E2E：
+
+```powershell
+docker exec sentry-api sh -c 'export TEST_DATABASE_URL="${DATABASE_URL%/*}/sentry_test"; python tests/e2e_shipyard_http.py'
+```
+
+## 人工业务走查
+
+1. 管理端建立船号、工程号、制作图绑定和二级区域定置。
+2. 导入到货清单，检查字段映射、重复行、缺失字段和区域冲突。
+3. 确认清单后，在小程序逐托拍吊牌，核对物料编码、品名、规格、批次、
+   托组后缀和整票总件数。
+4. 验证少收只按实收入库，缺件不冻结已有库存；补货后累计补足。
+5. 导入正式出库清单，检查库存匹配和阻断项。
+6. 在小程序逐托拍吊牌，必须拍齐整票托盘后才能扣减库存。
+7. 全部票货完成后确认装车，核对只生成一次库存流水和一次装车记录。
+8. 复核原图、OCR 记录、操作人、时间、区域路径和库存流水。
+
+## 上线前专项
+
+- 用真实吊牌样本测公网 OCR 的字段准确率和失败恢复；
+- 在微信真机测拍照、失败重试、弱网和原图上传；
+- 验证小程序合法域名、HTTPS、AppID 和隐私声明；
+- 连续提交同一幂等键，确认不重复收货、扣库或装车；
+- 验证角色收回、跨仓库访问和只读账号均被拒绝；
+- 由仓库和船厂完成至少一轮真实 UAT。
+
+未完成上述专项时，只能声明“代码与模拟验证通过”，不能声明“生产可用”。

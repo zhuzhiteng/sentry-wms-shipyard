@@ -74,7 +74,10 @@ Admin opens the TO detail and clicks **Start Picking**. The handler:
 - For each line, finds inventory rows at the source warehouse and creates one `pick_tasks` row per `(line, bin)` with `to_id` + `to_line_id` set (no `so_id`).
 - Anchors the tasks under a fresh `pick_batch` row.
 
-The picker then opens the mobile app, sees the active batch (with the "ACTIVE TRANSFER" label and the TO number on the v1.8 APK; "ACTIVE BATCH" + "0 orders" on the v1.5.1 APK), and works the tasks via the existing PickWalk + scan flow. Each confirmed pick:
+A field client can then query the active batch and work the tasks through the
+existing picking APIs. This distribution no longer packages the former Expo
+client, and the shipyard mini-program does not expose transfer-order picking.
+Each confirmed pick:
 
 - Updates `transfer_order_lines.picked_qty` via a WHERE-clause guard (`picked_qty + delta <= committed_qty AND status IN (PENDING, PARTIALLY_PICKED)`); over-pick attempts return 409 from the server.
 - Does **NOT** decrement source `quantity_on_hand` (TO inventory moves only at approval; the `quantity_allocated` reservation persists).

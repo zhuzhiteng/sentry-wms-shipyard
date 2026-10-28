@@ -43,10 +43,6 @@ build/
 # container on every restart after a version bump.
 api/BUILD_VERSION
 
-# Expo / React Native
-mobile/.expo/web/
-mobile/android/
-mobile/ios/
 site/
 
 # Proxy

@@ -32,7 +32,7 @@ test('keeps API details and turns them into a field-level recovery message', asy
 
   await assert.rejects(
     request({
-      path: '/shipyard/outbound/tasks/task-1/scan',
+      path: '/shipyard/outbound/tasks/task-1/label-recognition',
       method: 'POST',
       data: {},
     }),

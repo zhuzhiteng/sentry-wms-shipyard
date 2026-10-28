@@ -18,7 +18,6 @@
 
 # Top-level dirs not needed by api or its bake-in mappings
 admin/
-mobile/
 proxy/
 tools/
 docs/

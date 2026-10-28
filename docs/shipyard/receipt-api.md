@@ -28,10 +28,6 @@
 字段漏读时不提供手填代替，必须调整角度重拍。OCR 未配置或服务失败时，照片和
 `FAILED` 识别记录仍保留，但不能用于入库。
 
-旧接口 `POST /api/shipyard/inbound/tickets/<ticket_id>/scan` 和
-`POST /api/shipyard/inbound/tickets/<ticket_id>/photos` 仅供历史客户端兼容，
-不属于当前现场操作流程。
-
 ### 确认收货
 
 `POST /api/shipyard/inbound/tickets/<ticket_id>/receipts`
@@ -41,7 +37,7 @@
   "idempotency_key": "receipt-20261027-0001",
   "received_quantity": 3,
   "difference_reason": "少 1 件，已联系工厂补货",
-  "client_device_id": "PDA-A01",
+  "client_device_id": "WX-MINI-001",
   "pallets": [
     {
       "tag_suffix": "1-1",
@@ -65,7 +61,7 @@
 补收货以“剩余应收数量”为上限，不会再把整票计划数量误当成本次应收数量。
 
 小程序一次拍摄同时完成“识别”和“留证”：同一张原图只上传一次，既产生照片记录，
-也产生 OCR 记录。正常路径不打开扫码框。
+也产生 OCR 记录。正常路径不启动扫码模式。
 
 ### 少件报送
 
@@ -129,17 +125,15 @@
   `shipyard_stock_ledger` 当前是船厂库存的权威账。
 - 尚未把船厂票货同步到 Sentry 通用 `items` / `inventory` 聚合表；需要先确定
   船厂物料编码和通用物料主数据映射，不能按品名静默创建 SKU。
-- 配送需求、派工单、发货单和打印已由第三切片实现，见
-  [`outbound-documents-api.md`](outbound-documents-api.md)。
 - 正式出库清单识别、整票多吊牌拍照 OCR、照片留证、库存扣减和装车确认见
   [`formal-outbound-api.md`](formal-outbound-api.md)。
 - 当前自动化测试使用固定 OCR 结果；配置真实百度凭据后仍需用现场吊牌验证识别率。
 
 ## 验证
 
-- 全后端：`3043 passed, 55 skipped, 11 warnings`；
+- 全后端：`3026 passed, 55 skipped, 11 warnings`；
 - 吊牌 OCR 解析、provider 契约、收货/出库完整闭环共 8 项专项测试通过；
-- 管理端 32 个测试文件、203 项测试通过，生产构建通过；
-- 微信小程序 17 项 Node 测试通过；
+- 管理端 33 个测试文件、201 项测试通过，生产构建通过；
+- 微信小程序 15 项 Node 测试通过；
 - 触及 Python 文件 Ruff、格式检查、Bandit、迁移幂等检查通过；
 - `pip-audit` 和 `npm audit` 均无已知漏洞。

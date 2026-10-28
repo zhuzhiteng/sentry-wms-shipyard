@@ -33,7 +33,6 @@ test('outbound confirmation requires every local evidence item', () => {
     body.pallets.map((item) => item.label_recognition_id),
     ['recognition-1', 'recognition-2'],
   );
-  assert.equal(body.pallets[0].qr_payload, undefined);
 });
 
 test('receipt confirmation carries shortage reason without changing quantity', () => {
