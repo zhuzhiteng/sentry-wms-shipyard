@@ -186,6 +186,7 @@ def test_photo_ocr_receipt_and_outbound_need_no_qr_code(
             {
                 "material_code": "MAT-OCR",
                 "item_name": "船用支架",
+                "item_spec": "S-OCR",
                 "batch_no": f"{ship_no}-BATCH-1",
                 "tag_suffix": suffix,
                 "label_quantity": "4",
@@ -312,7 +313,7 @@ def test_missing_required_ocr_field_cannot_be_confirmed(
     assert data["matched"] is False
     assert {
         item["field"] for item in data["mismatches"] if item["reason"] == "REQUIRED"
-    } == {"material_code"}
+    } == {"material_code", "item_spec"}
 
     confirmation = client.post(
         f"/api/shipyard/inbound/tickets/{ticket['ticket_id']}/receipts",
@@ -331,6 +332,69 @@ def test_missing_required_ocr_field_cannot_be_confirmed(
     )
     assert confirmation.status_code == 422
     assert confirmation.get_json()["error"] == "pallet_validation_failed"
+
+
+def test_wrong_ocr_spec_cannot_be_confirmed(
+    client,
+    auth_headers,
+    monkeypatch,
+):
+    ship_no = f"H{uuid.uuid4().hex[:8].upper()}"
+    ticket = _confirmed_ticket(client, auth_headers, ship_no)
+    monkeypatch.setattr(
+        receipt_service,
+        "recognize_label_image",
+        lambda _content: _ocr_result(
+            {
+                "ship_no": ship_no,
+                "engineering_no": ship_no,
+                "production_drawing_no": "D-001",
+                "material_code": "MAT-OCR",
+                "item_name": "船用支架",
+                "item_spec": "S-WRONG",
+                "tag_suffix": "1-1",
+                "label_quantity": "4",
+            }
+        ),
+    )
+
+    response = _upload_label(
+        client,
+        auth_headers,
+        f"/api/shipyard/inbound/tickets/{ticket['ticket_id']}/label-recognition",
+    )
+
+    assert response.status_code == 201, response.get_json()
+    data = response.get_json()
+    assert data["matched"] is False
+    assert {(item["field"], item["reason"]) for item in data["mismatches"]} == {
+        ("item_spec", "MISMATCH")
+    }
+
+    confirmation = client.post(
+        f"/api/shipyard/inbound/tickets/{ticket['ticket_id']}/receipts",
+        json={
+            "idempotency_key": f"receipt-wrong-spec-{uuid.uuid4()}",
+            "received_quantity": 4,
+            "pallets": [
+                {
+                    "tag_suffix": "1-1",
+                    "label_recognition_id": data["recognition"]["recognition_id"],
+                    "photo_id": data["photo"]["photo_id"],
+                }
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert confirmation.status_code == 422
+    assert confirmation.get_json()["mismatches"] == [
+        {
+            "field": "item_spec",
+            "expected": "S-OCR",
+            "actual": "S-WRONG",
+            "reason": "MISMATCH",
+        }
+    ]
 
 
 def test_missing_suffix_is_selected_without_retyping_the_whole_label(

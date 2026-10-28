@@ -82,6 +82,7 @@ node --test miniprogram/tests/*.test.js
 - [船厂基线](docs/shipyard/baseline.md)
 - [收货与 OCR](docs/shipyard/receipt-api.md)
 - [正式出库与装车](docs/shipyard/formal-outbound-api.md)
+- [真实吊牌 OCR 验收](docs/shipyard/ocr-acceptance.md)
 - [风险闭环台账](docs/shipyard/risk-register.md)
 
 ## 状态边界

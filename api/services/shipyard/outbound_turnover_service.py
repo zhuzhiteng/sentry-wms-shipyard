@@ -205,6 +205,7 @@ def _field_mismatches(context, scan) -> list[dict[str, Any]]:
         ),
         ("material_code", context.material_code, scan.material_code),
         ("item_name", context.item_name, scan.item_name),
+        ("item_spec", context.item_spec, scan.item_spec),
         (
             "label_quantity",
             context.planned_quantity,
@@ -214,6 +215,8 @@ def _field_mismatches(context, scan) -> list[dict[str, Any]]:
     mismatches = []
     for field, expected_value, actual_value in expected:
         if actual_value is None:
+            continue
+        if field == "item_spec" and not str(expected_value or "").strip():
             continue
         if field == "label_quantity":
             matches = Decimal(expected_value) == Decimal(actual_value)
@@ -340,6 +343,9 @@ def save_outbound_task_photo(
 def _matching_outbound_tasks(db, fields: dict[str, Any], suffix: str | None):
     material_code = fields.get("material_code")
     item_name = fields.get("item_name")
+    item_spec = fields.get("item_spec")
+    ship_no = fields.get("ship_no")
+    production_drawing_no = fields.get("production_drawing_no")
     if not material_code or not item_name:
         return []
     rows = db.execute(
@@ -354,7 +360,18 @@ def _matching_outbound_tasks(db, fields: dict[str, Any], suffix: str | None):
                 ON o.outbound_order_id = t.outbound_order_id
              WHERE t.status = :pending
                AND upper(trim(l.material_code)) = upper(trim(:material_code))
-               AND trim(l.item_name) = trim(:item_name)
+               AND lower(trim(l.item_name)) = lower(trim(:item_name))
+               AND lower(trim(COALESCE(l.item_spec, '')))
+                   = lower(trim(COALESCE(:item_spec, '')))
+               AND (
+                    :ship_no = ''
+                    OR upper(trim(l.ship_no)) = upper(trim(:ship_no))
+               )
+               AND (
+                    :production_drawing_no = ''
+                    OR upper(trim(l.production_drawing_no))
+                        = upper(trim(:production_drawing_no))
+               )
                AND (
                     :tag_suffix = ''
                     OR :tag_suffix = ANY(t.expected_tag_suffixes)
@@ -367,6 +384,9 @@ def _matching_outbound_tasks(db, fields: dict[str, Any], suffix: str | None):
             "pending": SHIPYARD_OUTBOUND_TASK_PENDING,
             "material_code": material_code,
             "item_name": item_name,
+            "item_spec": item_spec or "",
+            "ship_no": ship_no or "",
+            "production_drawing_no": production_drawing_no or "",
             "tag_suffix": suffix or "",
         },
     ).fetchall()
@@ -426,7 +446,11 @@ def recognize_outbound_label_photo(
     suffix = _normalize_suffix(str(fields.get("tag_suffix") or ""))
     scan = fields_scan_view(fields, suffix=suffix or "")
     mismatches = _field_mismatches(context, scan)
-    append_required_field_mismatches(mismatches, scan)
+    append_required_field_mismatches(
+        mismatches,
+        scan,
+        expected={"item_spec": context.item_spec},
+    )
     if suffix and suffix not in set(context.expected_tag_suffixes):
         mismatches.append(
             {
@@ -869,7 +893,11 @@ def confirm_outbound_task(
                 {"tag_suffix": scan.tag_suffix},
             )
         mismatches = _field_mismatches(context, effective_scan)
-        append_required_field_mismatches(mismatches, effective_scan)
+        append_required_field_mismatches(
+            mismatches,
+            effective_scan,
+            expected={"item_spec": context.item_spec},
+        )
         if mismatches:
             raise OutboundValidationError(
                 "吊牌共同信息与出库任务不一致",

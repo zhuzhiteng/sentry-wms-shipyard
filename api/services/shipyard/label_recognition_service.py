@@ -32,22 +32,30 @@ _REQUIRED_LABEL_FIELDS = {
 _DEFAULT_REQUIRED_FIELDS = ("material_code", "item_name", "tag_suffix")
 
 
-def required_label_fields() -> frozenset[str]:
+def required_label_fields(
+    *,
+    expected: dict[str, Any] | None = None,
+) -> frozenset[str]:
     raw = os.getenv("SHIPYARD_OCR_REQUIRED_FIELDS", "")
     configured = {
         value.strip()
         for value in raw.split(",")
         if value.strip() in _REQUIRED_LABEL_FIELDS
     }
-    return frozenset(configured or _DEFAULT_REQUIRED_FIELDS)
+    fields = set(configured or _DEFAULT_REQUIRED_FIELDS)
+    if expected and str(expected.get("item_spec") or "").strip():
+        fields.add("item_spec")
+    return frozenset(fields)
 
 
 def append_required_field_mismatches(
     mismatches: list[dict[str, Any]],
     scan,
+    *,
+    expected: dict[str, Any] | None = None,
 ) -> None:
     mismatched_fields = {item["field"] for item in mismatches}
-    for field in required_label_fields():
+    for field in required_label_fields(expected=expected):
         if field in mismatched_fields or getattr(scan, field, None):
             continue
         mismatches.append(

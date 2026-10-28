@@ -96,9 +96,20 @@
 
       <view wx:if="{{scans.length}}" class="scans">
         <view wx:for="{{scans}}" wx:key="suffix" class="scan-row">
-          <view>
-            <view class="value">托盘 {{item.suffix}}</view>
-            <view class="muted">{{item.recognized.item_name || '已识别吊牌'}} · 照片 {{item.photo.file_name}}</view>
+          <view class="scan-main">
+            <image
+              wx:if="{{item.localPath}}"
+              class="scan-photo"
+              src="{{item.localPath}}"
+              mode="aspectFill"
+              data-path="{{item.localPath}}"
+              bindtap="previewScanPhoto"
+            />
+            <view class="scan-info">
+              <view class="value">托盘 {{item.suffix}}</view>
+              <view class="muted">{{item.recognized.item_name || '已识别吊牌'}} · {{item.recognized.item_spec || '无规格'}}</view>
+              <view class="scan-hint">点照片可核对原图</view>
+            </view>
           </view>
           <button class="mini-action" data-suffix="{{item.suffix}}" bindtap="removeScan">移除</button>
         </view>

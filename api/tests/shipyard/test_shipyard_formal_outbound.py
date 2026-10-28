@@ -263,6 +263,7 @@ def test_ocr_wrong_task_returns_the_candidate_task(
             fields={
                 "material_code": "MAT-SECOND",
                 "item_name": "第二票物料",
+                "item_spec": "S-100",
                 "tag_suffix": "1-1",
                 "label_quantity": "4",
             },
@@ -285,6 +286,59 @@ def test_ocr_wrong_task_returns_the_candidate_task(
     } >= {"material_code", "item_name"}
     assert [item["task_id"] for item in data["candidate_tasks"]] == [
         second_task["task_id"]
+    ]
+
+
+def test_outbound_ocr_rejects_wrong_item_spec(
+    client,
+    auth_headers,
+    monkeypatch,
+):
+    ticket = _received_material_ticket(client, auth_headers, monkeypatch)
+    _manifest, order = _preview_and_confirm_outbound(
+        client,
+        auth_headers,
+        ship_no=ticket["ship_no"],
+    )
+    task = order["tasks"][0]
+    monkeypatch.setattr(
+        outbound_turnover_service,
+        "recognize_label_image",
+        lambda _content: LabelOcrResult(
+            provider="baidu",
+            raw_text="",
+            raw_lines=[],
+            fields={
+                "ship_no": ticket["ship_no"],
+                "engineering_no": ticket["ship_no"],
+                "production_drawing_no": "D-001",
+                "material_code": "MAT-001",
+                "item_name": "船用支架",
+                "item_spec": "S-WRONG",
+                "tag_suffix": "1-1",
+                "label_quantity": "4",
+            },
+            confidence=0.98,
+        ),
+    )
+
+    response = client.post(
+        f"/api/shipyard/outbound/tasks/{task['task_id']}/label-recognition",
+        data={"file": (BytesIO(PNG_BYTES), "wrong-spec-label.png")},
+        content_type="multipart/form-data",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 201, response.get_json()
+    data = response.get_json()
+    assert data["matched"] is False
+    assert data["mismatches"] == [
+        {
+            "field": "item_spec",
+            "expected": "S-100",
+            "actual": "S-WRONG",
+            "reason": "MISMATCH",
+        }
     ]
 
 

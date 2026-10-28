@@ -232,10 +232,18 @@ def _scan_field_mismatches(
             context.item_name,
             getattr(scan, "item_name", None),
         ),
+        (
+            "item_spec",
+            context.item_spec,
+            getattr(scan, "item_spec", None),
+        ),
     )
     mismatches = []
     for field, expected, actual in expected_fields:
-        if field in {"material_code", "item_name"} and not hasattr(scan, field):
+        if field in {"material_code", "item_name", "item_spec"} and not hasattr(
+            scan,
+            field,
+        ):
             continue
         if not actual:
             if not expected or not require_expected_present:
@@ -649,7 +657,11 @@ def recognize_ticket_label_photo(
     suffix = _normalize_suffix(str(fields.get("tag_suffix") or ""))
     scan = fields_scan_view(fields, suffix=suffix or "")
     mismatches = _scan_field_mismatches(context, scan)
-    append_required_field_mismatches(mismatches, scan)
+    append_required_field_mismatches(
+        mismatches,
+        scan,
+        expected={"item_spec": context.item_spec},
+    )
     if suffix is None:
         if not any(item["field"] == "tag_suffix" for item in mismatches):
             mismatches.append(
@@ -1146,6 +1158,7 @@ def confirm_ticket_receipt(
         append_required_field_mismatches(
             required_mismatches,
             effective_scan,
+            expected={"item_spec": context.item_spec},
         )
         if required_mismatches:
             raise PalletValidationError(

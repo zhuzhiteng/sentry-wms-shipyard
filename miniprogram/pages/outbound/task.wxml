@@ -53,8 +53,17 @@
         </view>
         <view class="chip chip-success">已匹配</view>
       </view>
+      <image
+        wx:if="{{item.localPath}}"
+        class="scan-photo"
+        src="{{item.localPath}}"
+        mode="aspectFill"
+        data-path="{{item.localPath}}"
+        bindtap="previewScanPhoto"
+      />
+      <view wx:if="{{item.localPath}}" class="photo-hint">点照片核对原图</view>
       <view class="checks">
-        <text>照片 OCR 已读取物料编码、品名和托盘后缀</text>
+        <text>照片 OCR 已读取并校验物料身份及托盘后缀</text>
         <text>原照片已上传并绑定当前任务</text>
       </view>
       <button class="remove-button" data-suffix="{{item.suffix}}" bindtap="removeScan">重拍此托</button>

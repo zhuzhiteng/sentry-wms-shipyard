@@ -166,9 +166,9 @@ GET /api/shipyard/outbound/mobile/orders/<outbound_order_id>
 ```
 
 默认强制字段由 `SHIPYARD_OCR_REQUIRED_FIELDS` 配置，出库默认是
-`material_code,item_name,tag_suffix`。字段一旦识别到就必须与任务完全一致；
-未识别到强制字段时返回 `mismatches[].reason=REQUIRED`，不能用任务快照代替
-吊牌值。
+`material_code,item_name,tag_suffix`。任务清单有 `item_spec` 时，规格自动成为
+强制字段。字段一旦识别到就必须与任务完全一致；未识别到强制字段时返回
+`mismatches[].reason=REQUIRED`，不能用任务快照代替吊牌值。
 
 如果 OCR 只漏读托盘后缀，接口返回 `needs_suffix=true` 和本任务全部托盘后缀。
 小程序从“尚未拍摄的后缀”中选择实际托盘，不再要求重打整张吊牌。照片已经保存，
@@ -258,7 +258,7 @@ HTTPS API 域名、微信 request/uploadFile 合法域名和真实 AppID。
 
 ## 验证
 
-- 全后端：`3026 passed, 55 skipped, 11 warnings`；
+- 全后端：`3037 passed, 55 skipped, 11 warnings`；
 - 087、088、089 迁移在 `sentry_test` 连续执行两次成功；
 - 全新空库执行 `db/schema.sql` 后，正式出库、任务、核销和装车 4 类核心表均存在；
 - 管理端：干净 Node 20 依赖树中 33 个测试文件、201 项测试通过，生产构建通过；
@@ -273,14 +273,14 @@ HTTPS API 域名、微信 request/uploadFile 合法域名和真实 AppID。
 
 本切片使用独立测试库完成了一次服务级完整闭环：创建船号绑定和区域 → 导入并确认
 到货清单 → 两次吊牌 OCR 收货 → 导入并确认正式出库清单 → 两次吊牌 OCR
-核验物料编码/品名 → 扣减库存 → 整单装车。最终库存余额为 `0.000`、出库单为
+核验物料编码/品名/规格 → 扣减库存 → 整单装车。最终库存余额为 `0.000`、出库单为
 `LOADED`，每托照片和 OCR 记录一一绑定。OCR 调用使用固定结果，不等同于真实云
 OCR、小程序真机和现场吊牌 UAT。
 
 可重复的真实 HTTP E2E 由 `api/tests/e2e_shipyard_http.py` 执行。该脚本会启动
 本机回环 Flask 服务，完整走登录、配置、清单确认、两托 OCR 收货、缺后缀补选、
 整票扣库、装车、后台重新查询和原图字节校验；同时覆盖缺托、重复照片、错误物料
-编码/品名、OCR provider 失败、角色和页面权限、跨仓库隔离、同幂等键并发、新幂等键
+编码/品名/规格、OCR provider 失败、角色和页面权限、跨仓库隔离、同幂等键并发、新幂等键
 重复操作 `409`，以及并发装车只写一次。收货、核销、装车分别提交 50 个请求，
 最多 10 路并发；结束后检查票货余额、库存流水、收货累计、照片/OCR 归属、托盘
 状态和装车确认唯一性。额外使用 250 请求、50 并发连续执行两轮并通过；E2E 启动

@@ -14,7 +14,7 @@ OCR 识别和留证。
 ## 自动化验证
 
 ```powershell
-docker exec sentry-api sh -c 'export TEST_DATABASE_URL="${DATABASE_URL%/*}/sentry_test"; python -m pytest tests/shipyard tests/test_087_shipyard_label_ocr_migration.py tests/test_088_shipyard_remove_legacy_qr_migration.py tests/test_089_shipyard_remove_distribution_dispatch_migration.py -q'
+docker exec sentry-api sh -c 'export FLASK_ENV=test SENTRY_ALLOW_HTTP_WEBHOOKS=false SENTRY_ALLOW_INTERNAL_WEBHOOKS=false TEST_DATABASE_URL="${DATABASE_URL%/*}/sentry_test"; python -m pytest tests/shipyard tests/test_087_shipyard_label_ocr_migration.py tests/test_088_shipyard_remove_legacy_qr_migration.py tests/test_089_shipyard_remove_distribution_dispatch_migration.py -q'
 ```
 
 ```powershell
@@ -35,7 +35,7 @@ npm audit --audit-level=high
 HTTP E2E：
 
 ```powershell
-docker exec sentry-api sh -c 'export TEST_DATABASE_URL="${DATABASE_URL%/*}/sentry_test"; python tests/e2e_shipyard_http.py'
+docker exec sentry-api sh -c 'export FLASK_ENV=test SENTRY_ALLOW_HTTP_WEBHOOKS=false SENTRY_ALLOW_INTERNAL_WEBHOOKS=false TEST_DATABASE_URL="${DATABASE_URL%/*}/sentry_test"; python tests/e2e_shipyard_http.py'
 ```
 
 ## 人工业务走查
@@ -52,7 +52,8 @@ docker exec sentry-api sh -c 'export TEST_DATABASE_URL="${DATABASE_URL%/*}/sentr
 
 ## 上线前专项
 
-- 用真实吊牌样本测公网 OCR 的字段准确率和失败恢复；
+- 按 [`shipyard/ocr-acceptance.md`](shipyard/ocr-acceptance.md) 用真实脱敏吊牌
+  样本测公网 OCR 的字段准确率、耗时和失败恢复，并保留仓库外报告；
 - 在微信真机测拍照、失败重试、弱网和原图上传；
 - 验证小程序合法域名、HTTPS、AppID 和隐私声明；
 - 连续提交同一幂等键，确认不重复收货、扣库或装车；
