@@ -7,6 +7,7 @@ const {
 const FIELD_LABELS = {
   material_code: '物料编码',
   item_name: '品名',
+  item_spec: '规格',
   tag_suffix: '托盘后缀',
   ship_no: '船号',
   engineering_no: '工程号',

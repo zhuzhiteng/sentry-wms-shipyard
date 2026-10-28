@@ -3,7 +3,7 @@
 import pytest
 
 from services.shipyard import label_ocr
-from services.shipyard.errors import OcrUnavailableError
+from services.shipyard.errors import OcrProviderError, OcrUnavailableError
 
 
 def test_parse_label_text_supports_colons_spaces_next_line_and_suffix():
@@ -103,3 +103,74 @@ def test_baidu_provider_contract_is_normalized_without_network(monkeypatch):
     assert len(calls) == 2
     assert calls[1][1]["params"]["access_token"] == "test-token"
     assert calls[1][1]["data"]["image"] == "aW1hZ2U="
+
+
+def test_baidu_retries_once_after_an_expired_access_token(monkeypatch):
+    calls = []
+
+    class Response:
+        def __init__(self, payload):
+            self.status_code = 200
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    def fake_post(url, **kwargs):
+        calls.append((url, kwargs))
+        if url == label_ocr.BAIDU_OAUTH_URL:
+            token = "expired-token" if len(calls) == 1 else "fresh-token"
+            return Response({"access_token": token, "expires_in": 3600})
+        token = kwargs["params"]["access_token"]
+        if token == "expired-token":
+            return Response({"error_code": 110, "error_msg": "expired"})
+        return Response(
+            {
+                "words_result": [
+                    {"words": "物料编码：MAT-001"},
+                    {"words": "品名：船用支架"},
+                    {"words": "规格：S-100"},
+                    {"words": "托盘后缀：1-1"},
+                ]
+            }
+        )
+
+    monkeypatch.setenv("BAIDU_OCR_API_KEY", "test-key")
+    monkeypatch.setenv("BAIDU_OCR_SECRET_KEY", "test-secret")
+    monkeypatch.setattr(label_ocr.requests, "post", fake_post)
+    label_ocr._TOKEN_CACHE.clear()
+
+    result = label_ocr.recognize_label_image(b"image")
+
+    assert result.fields["item_spec"] == "S-100"
+    assert [call[0] for call in calls] == [
+        label_ocr.BAIDU_OAUTH_URL,
+        label_ocr.BAIDU_OCR_URL,
+        label_ocr.BAIDU_OAUTH_URL,
+        label_ocr.BAIDU_OCR_URL,
+    ]
+    assert calls[3][1]["params"]["access_token"] == "fresh-token"
+
+
+def test_baidu_timeout_is_reported_as_provider_error(monkeypatch):
+    class Response:
+        status_code = 200
+
+        def json(self):
+            return {"access_token": "test-token", "expires_in": 3600}
+
+    def fake_post(url, **kwargs):
+        if url == label_ocr.BAIDU_OAUTH_URL:
+            return Response()
+        raise label_ocr.requests.Timeout("timed out")
+
+    monkeypatch.setenv("BAIDU_OCR_API_KEY", "test-key")
+    monkeypatch.setenv("BAIDU_OCR_SECRET_KEY", "test-secret")
+    monkeypatch.setattr(label_ocr.requests, "post", fake_post)
+    label_ocr._TOKEN_CACHE.clear()
+
+    with pytest.raises(OcrProviderError) as raised:
+        label_ocr.recognize_label_image(b"image")
+
+    assert raised.value.code == "ocr_provider_error"
+    assert raised.value.message == "吊牌 OCR 服务暂时不可用"

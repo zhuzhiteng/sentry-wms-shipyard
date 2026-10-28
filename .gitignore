@@ -52,3 +52,7 @@ proxy/certs/*.pem
 # Local .env backups (never commit; see also .env above)
 .env.backup*
 *.env.backup*
+
+# Local OCR acceptance evidence contains real label photos or raw extracted text.
+shipyard-ocr-report-*.json
+shipyard-ocr-report-*.md

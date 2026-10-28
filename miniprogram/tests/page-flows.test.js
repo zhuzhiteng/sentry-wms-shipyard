@@ -36,6 +36,7 @@ function instantiate(definition) {
 
 test('receiving captures once and uses OCR without scanning a QR code', async () => {
   const uploads = [];
+  const previews = [];
   const session = {
     user: { username: 'receiver' },
     warehouseId: 1,
@@ -69,6 +70,7 @@ test('receiving captures once and uses OCR without scanning a QR code', async ()
     chooseMedia: async () => ({
       tempFiles: [{ tempFilePath: '/tmp/label.jpg' }],
     }),
+    previewImage: (options) => previews.push(options),
     showToast: () => {},
     showModal: () => {},
   };
@@ -92,8 +94,17 @@ test('receiving captures once and uses OCR without scanning a QR code', async ()
   );
   assert.equal(page.data.scans.length, 1);
   assert.equal(page.data.scans[0].recognition.recognition_id, 'recognition-1');
+  assert.equal(page.data.scans[0].localPath, '/tmp/label.jpg');
   assert.equal(page.data.palletProgressText, '1 / 2 托');
   assert.equal(page.data.nextSuffix, '还差 1 托');
+
+  page.previewScanPhoto({
+    currentTarget: { dataset: { path: page.data.scans[0].localPath } },
+  });
+  assert.deepEqual(previews[0], {
+    current: '/tmp/label.jpg',
+    urls: ['/tmp/label.jpg'],
+  });
 });
 
 test('receiving submits a short quantity with fewer pallets and its reason', async () => {
@@ -153,6 +164,7 @@ test('receiving submits a short quantity with fewer pallets and its reason', asy
 });
 
 test('outbound asks only for the remaining suffix when OCR misses it', async () => {
+  const previews = [];
   const session = {
     user: { username: 'outbound' },
     warehouseId: 1,
@@ -178,6 +190,7 @@ test('outbound asks only for the remaining suffix when OCR misses it', async () 
     chooseMedia: async () => ({
       tempFiles: [{ tempFilePath: '/tmp/label.jpg' }],
     }),
+    previewImage: (options) => previews.push(options),
     showToast: () => {},
     showModal: () => {},
   };
@@ -207,7 +220,16 @@ test('outbound asks only for the remaining suffix when OCR misses it', async () 
   assert.equal(page.data.suffixPickerVisible, false);
   assert.equal(page.data.scans.length, 2);
   assert.equal(page.data.scans[1].recognition.recognition_id, 'recognition-2');
+  assert.equal(page.data.scans[1].localPath, '/tmp/label.jpg');
   assert.equal(page.data.can_confirm, true);
+
+  page.previewScanPhoto({
+    currentTarget: { dataset: { path: page.data.scans[1].localPath } },
+  });
+  assert.deepEqual(previews[0], {
+    current: '/tmp/label.jpg',
+    urls: ['/tmp/label.jpg'],
+  });
 });
 
 test('outbound list refreshes whenever the task screen returns', () => {

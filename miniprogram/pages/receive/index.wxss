@@ -53,8 +53,35 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16rpx;
   padding: 20rpx 0;
   border-bottom: 1rpx solid #e8edf1;
+}
+
+.scan-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  gap: 16rpx;
+}
+
+.scan-photo {
+  flex: 0 0 88rpx;
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 10rpx;
+  background: #eef5f9;
+}
+
+.scan-info {
+  min-width: 0;
+}
+
+.scan-hint {
+  margin-top: 4rpx;
+  color: #29704f;
+  font-size: 21rpx;
 }
 
 .mini-action {

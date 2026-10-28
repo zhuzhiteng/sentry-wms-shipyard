@@ -41,6 +41,20 @@
   border-left: 6rpx solid #3b8b67;
 }
 
+.scan-photo {
+  width: 180rpx;
+  height: 124rpx;
+  margin-top: 18rpx;
+  border-radius: 12rpx;
+  background: #eef5f9;
+}
+
+.photo-hint {
+  margin-top: 6rpx;
+  color: #29704f;
+  font-size: 21rpx;
+}
+
 .checks {
   display: flex;
   flex-direction: column;

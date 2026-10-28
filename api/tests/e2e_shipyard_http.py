@@ -455,6 +455,7 @@ def run() -> dict:
                 "production_drawing_no": "D-001",
                 "material_code": material_code,
                 "item_name": item_name,
+                "item_spec": "S-E2E",
                 "batch_no": f"{ship_no}-BATCH-1",
                 "tag_suffix": suffix,
                 "label_quantity": "4",
@@ -467,6 +468,7 @@ def run() -> dict:
             {
                 "material_code": f"WRONG-{material_code}",
                 "item_name": f"错误-{item_name}",
+                "item_spec": "S-WRONG",
                 "batch_no": f"{ship_no}-BATCH-1",
                 "tag_suffix": suffixes[0],
                 "label_quantity": "4",
@@ -476,6 +478,7 @@ def run() -> dict:
             {
                 "material_code": material_code,
                 "item_name": item_name,
+                "item_spec": "S-E2E",
                 "batch_no": f"{ship_no}-BATCH-1",
                 "label_quantity": "4",
             }
@@ -484,6 +487,7 @@ def run() -> dict:
             {
                 "material_code": material_code,
                 "item_name": item_name,
+                "item_spec": "S-E2E",
                 "batch_no": f"{ship_no}-BATCH-1",
                 "tag_suffix": suffixes[1],
                 "label_quantity": "4",
@@ -981,10 +985,10 @@ def run() -> dict:
             }
             if (
                 wrong_label["matched"]
-                or not {"material_code", "item_name"} <= wrong_fields
+                or not {"material_code", "item_name", "item_spec"} <= wrong_fields
             ):
                 raise AssertionError(wrong_label)
-            steps.append("错误物料编码/品名被OCR规则定位并拒绝核销")
+            steps.append("错误物料编码/品名/规格被 OCR 规则定位并拒绝核销")
 
             evidence = []
             first_recognition = _json(

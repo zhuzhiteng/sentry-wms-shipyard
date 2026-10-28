@@ -88,6 +88,7 @@ Page({
         filePath,
         timeout: 45000,
       });
+      result.localPath = filePath;
       const mismatches = result.mismatches || [];
       const blocking = mismatches.filter((item) => item.field !== 'tag_suffix');
       if (blocking.length) {
@@ -168,6 +169,7 @@ Page({
       ...this.data.scans,
       {
         suffix,
+        localPath: result.localPath || '',
         recognition: result.recognition,
         recognized: result.recognized || {},
         photo: result.photo,
@@ -223,6 +225,7 @@ Page({
       production_drawing_no: '制作图号',
       material_code: '物料编码',
       item_name: '品名',
+      item_spec: '规格',
       label_quantity: '件数',
       tag_suffix: '托盘后缀',
     };
@@ -267,6 +270,15 @@ Page({
         scans.map((item) => item.suffix),
       ),
       can_confirm: scans.length === this.data.task.expected_tag_suffixes.length,
+    });
+  },
+
+  previewScanPhoto(event) {
+    const localPath = event.currentTarget.dataset.path;
+    if (!localPath) return;
+    wx.previewImage({
+      current: localPath,
+      urls: [localPath],
     });
   },
 

@@ -198,6 +198,7 @@ Page({
         ...this.data.scans,
         {
           suffix,
+          localPath: filePath,
           recognition: result.recognition,
           recognized: result.recognized || {},
           photo: result.photo,
@@ -234,6 +235,7 @@ Page({
       production_drawing_no: '制作图号',
       material_code: '物料编码',
       item_name: '品名',
+      item_spec: '规格',
       label_quantity: '件数',
       tag_suffix: '托盘后缀',
     };
@@ -301,6 +303,15 @@ Page({
         : progress.remaining > 0
           ? `还差 ${progress.remaining} 托`
           : '',
+    });
+  },
+
+  previewScanPhoto(event) {
+    const localPath = event.currentTarget.dataset.path;
+    if (!localPath) return;
+    wx.previewImage({
+      current: localPath,
+      urls: [localPath],
     });
   },
 

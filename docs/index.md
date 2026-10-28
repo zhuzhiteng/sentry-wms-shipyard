@@ -55,6 +55,7 @@ docker compose up -d --build
 - [到货清单](shipyard/inbound-api.md)
 - [拍照识别收货](shipyard/receipt-api.md)
 - [正式出库与装车](shipyard/formal-outbound-api.md)
+- [真实吊牌 OCR 验收](shipyard/ocr-acceptance.md)
 - [风险台账](shipyard/risk-register.md)
 - [部署](deployment.md)
 - [测试手册](test-lab.md)
