@@ -787,3 +787,172 @@ test('loading conflict clears its key and refreshes the order list', async () =>
   assert.equal(page.data.loadingUncertain, false);
   assert.equal(storage.size, 0);
 });
+
+test('receiving persists an in-flight marker before awaiting the response', async () => {
+  let releaseRequest;
+  let markStarted;
+  const started = new Promise((resolve) => {
+    markStarted = resolve;
+  });
+  const session = {
+    user: { username: 'receiver' },
+    warehouseId: 1,
+  };
+  installMock('utils/session.js', {
+    requireSession: () => session,
+  });
+  installMock('utils/request.js', {
+    request: async () => {
+      markStarted();
+      return new Promise((resolve) => {
+        releaseRequest = resolve;
+      });
+    },
+    upload: async () => ({}),
+  });
+  global.wx = {
+    showToast: () => {},
+    showModal: () => {},
+  };
+  installMemoryStorage(global.wx);
+
+  const page = instantiate(loadPage('pages/receive/index.js'));
+  page.data.session = session;
+  page.draftScope = 'receipt:receiver:1';
+  page.data.selectedManifestId = 'manifest-1';
+  page.data.selectedTicket = {
+    ticket_id: 'ticket-1',
+    declared_quantity: '4.000',
+    received_quantity: '0.000',
+    expected_pallet_count: 2,
+    pallet_count: 0,
+  };
+  page.data.scans = [{
+    suffix: '1-1',
+    recognition: { recognition_id: 'recognition-1' },
+    photo: { photo_id: 'photo-1' },
+  }];
+  page.data.quantity = '2';
+  page.data.differenceReason = '少 2 件';
+
+  const confirmation = page.confirmReceipt();
+  await started;
+
+  const workflow = require('../utils/workflow');
+  assert.equal(
+    workflow.readDraft(page.draftScope).submission_pending,
+    true,
+  );
+
+  releaseRequest({
+    ticket: { item_name: '船用支架', received_quantity: '2.000' },
+    receipt: { location_path_snapshot: 'A 区 / A1' },
+  });
+  await confirmation;
+  assert.equal(workflow.readDraft(page.draftScope), null);
+});
+
+test('outbound persists an in-flight marker before awaiting the response', async () => {
+  let releaseRequest;
+  let markStarted;
+  const started = new Promise((resolve) => {
+    markStarted = resolve;
+  });
+  const session = {
+    user: { username: 'outbound' },
+    warehouseId: 1,
+  };
+  installMock('utils/session.js', {
+    requireSession: () => session,
+  });
+  installMock('utils/request.js', {
+    request: async () => {
+      markStarted();
+      return new Promise((resolve) => {
+        releaseRequest = resolve;
+      });
+    },
+    upload: async () => ({}),
+  });
+  global.wx = {
+    showToast: () => {},
+    showModal: () => {},
+    navigateBack: () => {},
+  };
+  installMemoryStorage(global.wx);
+
+  const page = instantiate(loadPage('pages/outbound/task.js'));
+  page.data.session = session;
+  page.data.taskId = 'task-1';
+  page.data.orderId = 'order-1';
+  page.draftScope = 'outbound:outbound:task-1';
+  page.data.task = {
+    task_id: 'task-1',
+    status: 'PENDING',
+    expected_tag_suffixes: ['1-1'],
+    expected_pallet_count: 1,
+  };
+  page.data.scans = [{
+    suffix: '1-1',
+    recognition: { recognition_id: 'recognition-1' },
+    photo: { photo_id: 'photo-1' },
+  }];
+
+  const confirmation = page.confirmOutbound();
+  await started;
+
+  const workflow = require('../utils/workflow');
+  assert.equal(
+    workflow.readDraft(page.draftScope).submission_pending,
+    true,
+  );
+
+  releaseRequest({
+    confirmation: {
+      quantity: '2.000',
+      location_path_snapshot: 'A 区 / A1',
+    },
+    order: { status: 'OUTBOUND' },
+  });
+  await confirmation;
+  assert.equal(workflow.readDraft(page.draftScope), null);
+});
+
+test('loading restores the uncertain state from its persisted key', async () => {
+  const session = {
+    user: { username: 'outbound' },
+    warehouseId: 1,
+  };
+  installMock('utils/session.js', {
+    requireSession: () => session,
+  });
+  installMock('utils/request.js', {
+    request: async () => ({
+      order: {
+        outbound_order_id: 'order-1',
+        outbound_order_no: 'OUT-1',
+        status: 'OUTBOUND',
+      },
+      summary: {},
+      tasks: [],
+    }),
+    upload: async () => ({}),
+  });
+  global.wx = {
+    showToast: () => {},
+    showModal: () => {},
+  };
+  installMemoryStorage(global.wx);
+
+  const page = instantiate(loadPage('pages/outbound/index.js'));
+  page.data.session = session;
+  const workflow = require('../utils/workflow');
+  workflow.getOrCreateSubmissionKey(
+    'loading-submit:outbound:order-1',
+    'loading',
+  );
+
+  await page.openOrder('order-1');
+
+  assert.equal(page.data.loadingUncertain, true);
+});

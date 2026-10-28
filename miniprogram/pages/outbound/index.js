@@ -3,6 +3,7 @@ const { requireSession } = require('../../utils/session');
 const {
   clearSubmissionKey,
   getOrCreateSubmissionKey,
+  hasSubmissionKey,
   isAmbiguousSubmissionError,
 } = require('../../utils/workflow');
 
@@ -105,16 +106,16 @@ Page({
         batch_text: (task.pallets || [])[0]?.batch_no || '—',
       }));
       const selectedOrder = { ...data, tasks };
-      const loadingUncertain = data.order.status === 'LOADED'
-        ? false
-        : this.data.loadingUncertain;
+      const loadingScope = loadingSubmissionScope(
+        this.data.session,
+        data.order.outbound_order_id,
+      );
+      let loadingUncertain = this.data.loadingUncertain;
       if (data.order.status === 'LOADED') {
-        clearSubmissionKey(
-          loadingSubmissionScope(
-            this.data.session,
-            data.order.outbound_order_id,
-          ),
-        );
+        loadingUncertain = false;
+        clearSubmissionKey(loadingScope);
+      } else if (data.order.status === 'OUTBOUND') {
+        loadingUncertain = hasSubmissionKey(loadingScope);
       }
       this.setData({
         selectedOrder,
@@ -167,10 +168,6 @@ Page({
       this.data.session,
       order.order.outbound_order_id,
     );
-    const submissionKey = getOrCreateSubmissionKey(
-      submissionScope,
-      'loading',
-    );
     wx.showModal({
       title: this.data.loadingUncertain ? '重试确认整单装车' : '确认整单装车',
       content: '',
@@ -179,6 +176,10 @@ Page({
       confirmText: '确认装车',
       success: async (result) => {
         if (!result.confirm) return;
+        const submissionKey = getOrCreateSubmissionKey(
+          submissionScope,
+          'loading',
+        );
         this.setData({ busy: true });
         try {
           const data = await request({

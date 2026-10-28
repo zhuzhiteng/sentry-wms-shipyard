@@ -45,6 +45,19 @@ function clearSubmissionKey(scope) {
   }
 }
 
+function hasSubmissionKey(scope) {
+  const storage = _storage();
+  if (!scope || !storage || typeof storage.getStorageSync !== 'function') {
+    return false;
+  }
+  try {
+    const existing = storage.getStorageSync(_key(PENDING_PREFIX, scope));
+    return typeof existing === 'string' && Boolean(existing);
+  } catch {
+    return false;
+  }
+}
+
 function isAmbiguousSubmissionError(error) {
   if (!error) return false;
   if (error.networkError || error.statusCode === 0) return true;
@@ -100,6 +113,7 @@ module.exports = {
   clearDraft,
   clearSubmissionKey,
   getOrCreateSubmissionKey,
+  hasSubmissionKey,
   isAmbiguousSubmissionError,
   readDraft,
   writeDraft,

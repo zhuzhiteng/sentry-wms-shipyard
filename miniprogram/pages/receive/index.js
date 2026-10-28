@@ -73,6 +73,7 @@ Page({
     const session = requireSession();
     if (!session) return;
     this.skipDraftPersist = false;
+    this.submissionPending = false;
     this.setData({
       session,
       warehouseId: session.warehouseId,
@@ -159,12 +160,15 @@ Page({
     const progress = scanProgress(ticket, scans);
     const remaining = numberText(remainingQuantity(ticket));
     this.skipDraftPersist = false;
+    this.submissionPending = false;
     this.setData({
       selectedTicket: ticket,
       scans,
       quantity: draft.quantity || remaining,
       differenceReason: draft.difference_reason || '',
-      submitUncertain: Boolean(draft.submit_uncertain),
+      submitUncertain: Boolean(
+        draft.submit_uncertain || draft.submission_pending,
+      ),
       palletProgressText: progress.text,
       remainingQuantityText: remaining,
       nextSuffix: progress.remaining === null
@@ -237,6 +241,7 @@ Page({
     }
     clearDraft(this.draftScope);
     this.skipDraftPersist = false;
+    this.submissionPending = false;
     this.setData({
       selectedTicket: ticket,
       scans: [],
@@ -429,6 +434,7 @@ Page({
       quantity: this.data.quantity,
       difference_reason: this.data.differenceReason,
       submit_uncertain: this.data.submitUncertain,
+      submission_pending: Boolean(this.submissionPending),
     });
   },
 
@@ -465,6 +471,7 @@ Page({
       deviceId: `wx-${this.data.session.user.username}`,
     });
     this.skipDraftPersist = false;
+    this.submissionPending = true;
     this.setData({ busy: true, submitUncertain: false });
     this.persistDraft();
     try {
@@ -474,6 +481,7 @@ Page({
         data: body,
       });
       this.skipDraftPersist = true;
+      this.submissionPending = false;
       clearDraft(this.draftScope);
       clearSubmissionKey(submissionScope);
       wx.showModal({
@@ -494,6 +502,7 @@ Page({
     } catch (error) {
       if (isAmbiguousSubmissionError(error)) {
         this.skipDraftPersist = false;
+        this.submissionPending = false;
         this.setData({ submitUncertain: true });
         this.persistDraft();
         wx.showModal({
@@ -504,6 +513,7 @@ Page({
         });
       } else if (error.statusCode === 409) {
         this.skipDraftPersist = true;
+        this.submissionPending = false;
         clearDraft(this.draftScope);
         clearSubmissionKey(submissionScope);
         this.setData({ submitUncertain: false });
@@ -515,6 +525,7 @@ Page({
         });
       } else {
         this.skipDraftPersist = false;
+        this.submissionPending = false;
         clearSubmissionKey(submissionScope);
         this.setData({ submitUncertain: false });
         this.persistDraft();

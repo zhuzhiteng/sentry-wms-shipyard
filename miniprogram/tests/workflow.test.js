@@ -5,6 +5,7 @@ const {
   clearDraft,
   clearSubmissionKey,
   getOrCreateSubmissionKey,
+  hasSubmissionKey,
   isAmbiguousSubmissionError,
   readDraft,
   writeDraft,
@@ -30,9 +31,11 @@ test('reuses a pending submission key until the business action is resolved', ()
   );
 
   assert.equal(first, repeated);
+  assert.equal(hasSubmissionKey('receipt:receiver:ticket-1'), true);
   assert.equal(values.size, 1);
 
   clearSubmissionKey('receipt:receiver:ticket-1');
+  assert.equal(hasSubmissionKey('receipt:receiver:ticket-1'), false);
   const next = getOrCreateSubmissionKey('receipt:receiver:ticket-1', 'receipt');
   assert.notEqual(first, next);
 });

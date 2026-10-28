@@ -44,6 +44,7 @@ Page({
     const session = requireSession();
     if (!session) return;
     this.skipDraftPersist = false;
+    this.submissionPending = false;
     this.setData({
       session,
       taskId: options.taskId,
@@ -79,8 +80,9 @@ Page({
         ? draft.scans
         : this.data.scans;
       let submitUncertain = hadDraft
-        ? Boolean(draft.submit_uncertain)
+        ? Boolean(draft.submit_uncertain || draft.submission_pending)
         : this.data.submitUncertain;
+      this.submissionPending = false;
       let pendingCapture = hadDraft ? (draft.pending_capture || null) : null;
       let suffixChoices = hadDraft && Array.isArray(draft.suffix_choices)
         ? draft.suffix_choices
@@ -90,6 +92,7 @@ Page({
           wx.showToast({ title: '该票已完成出库，草稿已清理', icon: 'none' });
         }
         this.skipDraftPersist = true;
+        this.submissionPending = false;
         clearDraft(this.draftScope);
         clearSubmissionKey(
           outboundSubmissionScope(this.data.session, task.task_id),
@@ -196,6 +199,7 @@ Page({
       pendingCapture: result,
     });
     this.skipDraftPersist = false;
+    this.submissionPending = false;
     this.persistDraft();
   },
 
@@ -226,6 +230,7 @@ Page({
       pendingCapture: null,
     });
     this.skipDraftPersist = false;
+    this.submissionPending = false;
     this.persistDraft();
     wx.showToast({ title: '照片已留证，本次未计入核销', icon: 'none' });
   },
@@ -253,6 +258,7 @@ Page({
       can_confirm: scans.length === task.expected_tag_suffixes.length,
     });
     this.skipDraftPersist = false;
+    this.submissionPending = false;
     this.persistDraft();
     wx.showToast({ title: `托盘 ${suffix} 识别通过`, icon: 'success' });
   },
@@ -342,6 +348,7 @@ Page({
       can_confirm: scans.length === this.data.task.expected_tag_suffixes.length,
     });
     this.skipDraftPersist = false;
+    this.submissionPending = false;
     this.persistDraft();
   },
 
@@ -363,6 +370,7 @@ Page({
       pending_capture: this.data.pendingCapture,
       suffix_choices: this.data.suffixChoices,
       submit_uncertain: this.data.submitUncertain,
+      submission_pending: Boolean(this.submissionPending),
     });
   },
 
@@ -391,6 +399,7 @@ Page({
       `wx-${this.data.session.user.username}`,
     );
     this.skipDraftPersist = false;
+    this.submissionPending = true;
     this.setData({ busy: true, submitUncertain: false });
     this.persistDraft();
     try {
@@ -400,6 +409,7 @@ Page({
         data: body,
       });
       this.skipDraftPersist = true;
+      this.submissionPending = false;
       clearDraft(this.draftScope);
       clearSubmissionKey(submissionScope);
       wx.showModal({
@@ -411,6 +421,7 @@ Page({
     } catch (error) {
       if (isAmbiguousSubmissionError(error)) {
         this.skipDraftPersist = false;
+        this.submissionPending = false;
         this.setData({ submitUncertain: true });
         this.persistDraft();
         wx.showModal({
@@ -421,6 +432,7 @@ Page({
         });
       } else if (error.statusCode === 409) {
         this.skipDraftPersist = true;
+        this.submissionPending = false;
         clearDraft(this.draftScope);
         clearSubmissionKey(submissionScope);
         this.setData({ submitUncertain: false });
@@ -432,6 +444,7 @@ Page({
         });
       } else {
         this.skipDraftPersist = false;
+        this.submissionPending = false;
         clearSubmissionKey(submissionScope);
         this.setData({ submitUncertain: false });
         this.persistDraft();
