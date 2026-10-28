@@ -58,6 +58,18 @@
 自动测试中的 OCR 是确定性 stub。它证明事务、字段校验和证据链路，不证明真实
 百度 OCR 对现场吊牌的识别率。
 
+## 当前验证与交付
+
+- 清理代码提交：`1a149b7865811874847e707650ff92c880a8623e`；
+- CI 配置测试修复提交：`df859d3d3b75f7f79cda9d2c16c67f99435bf98f`；
+- 交付 PR：`https://github.com/zhuzhiteng/sentry-wms-shipyard/pull/1`；
+- 后端全量：`3026 passed, 55 skipped, 11 warnings`；
+- 管理端：33 个测试文件、201 项通过，生产构建通过；
+- 微信小程序：15 项通过；
+- PR required checks：Tests `40706673891`、Dependency Audit `40706673580`、
+  gitleaks `40706673621`、Lockfile Version Check `40706673906` 全部通过；
+- 本交付没有生产部署、真实 OCR、微信真机或船厂 UAT 证据。
+
 ## 当前发布结论
 
 代码、自动测试和模拟流程通过只说明研发侧可交付，不等于生产可用。以下事项仍需
