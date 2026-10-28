@@ -45,3 +45,30 @@ test('keeps API details and turns them into a field-level recovery message', asy
     },
   );
 });
+
+test('marks transport failures as ambiguous writes', async () => {
+  global.wx = {
+    getStorageSync: () => ({
+      token: 'test-token',
+      apiBase: 'http://api.test/api',
+      loginTimestamp: Date.now(),
+    }),
+    request: (options) => {
+      options.fail({ errMsg: 'request:fail timeout' });
+    },
+  };
+
+  await assert.rejects(
+    request({
+      path: '/shipyard/inbound/tickets/ticket-1/receipts',
+      method: 'POST',
+      data: {},
+    }),
+    (error) => {
+      assert.equal(error.networkError, true);
+      assert.equal(error.statusCode, 0);
+      assert.match(error.message, /timeout/);
+      return true;
+    },
+  );
+});

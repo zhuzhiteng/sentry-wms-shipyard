@@ -16,6 +16,17 @@
   margin-top: 24rpx;
 }
 
+.uncertain-banner {
+  margin: 18rpx 0;
+  padding: 16rpx 18rpx;
+  border-left: 6rpx solid #b26a20;
+  border-radius: 10rpx;
+  color: #73420d;
+  background: #fff4e5;
+  font-size: 23rpx;
+  line-height: 1.55;
+}
+
 .filter {
   flex: 1;
   padding: 14rpx 0;

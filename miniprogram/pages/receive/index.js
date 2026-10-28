@@ -1,4 +1,3 @@
-const { createIdempotencyKey } = require('../../utils/idempotency');
 const { buildReceiptConfirmation } = require('../../utils/payload');
 const {
   remainingQuantity,
@@ -8,6 +7,14 @@ const {
 const { request, upload } = require('../../utils/request');
 const { normalizeSuffix } = require('../../utils/pallet');
 const { requireSession } = require('../../utils/session');
+const {
+  clearDraft,
+  clearSubmissionKey,
+  getOrCreateSubmissionKey,
+  isAmbiguousSubmissionError,
+  readDraft,
+  writeDraft,
+} = require('../../utils/workflow');
 
 const STATUS_LABELS = {
   PARSED: '待确认',
@@ -33,6 +40,14 @@ function numberText(value) {
   return Number.isInteger(number) ? String(number) : number.toFixed(3);
 }
 
+function receiptDraftScope(session, warehouseId) {
+  return `receipt:${session.user.username}:${warehouseId}`;
+}
+
+function receiptSubmissionScope(session, ticketId) {
+  return `receipt-submit:${session.user.username}:${ticketId}`;
+}
+
 Page({
   data: {
     session: null,
@@ -45,6 +60,7 @@ Page({
     quantity: '',
     differenceReason: '',
     busy: false,
+    submitUncertain: false,
     loading: false,
     cameraVisible: false,
     pendingSuffix: '',
@@ -56,15 +72,26 @@ Page({
   onLoad() {
     const session = requireSession();
     if (!session) return;
+    this.skipDraftPersist = false;
     this.setData({
       session,
       warehouseId: session.warehouseId,
     });
+    this.draftScope = receiptDraftScope(session, session.warehouseId);
+    this.pendingDraft = readDraft(this.draftScope);
     this.loadManifests();
   },
 
   onPullDownRefresh() {
     this.loadManifests().finally(() => wx.stopPullDownRefresh());
+  },
+
+  onHide() {
+    this.persistDraft();
+  },
+
+  onUnload() {
+    this.persistDraft();
   },
 
   async loadManifests() {
@@ -79,6 +106,12 @@ Page({
         status_class: statusClass(item.status),
       }));
       this.setData({ manifests });
+      if (this.pendingDraft) {
+        const draft = this.pendingDraft;
+        this.pendingDraft = null;
+        await this.restoreDraft(draft);
+        return;
+      }
       if (this.data.selectedManifest) {
         await this.openManifest(this.data.selectedManifest.manifest.manifest_id);
       } else {
@@ -95,6 +128,52 @@ Page({
     } finally {
       this.setData({ loading: false });
     }
+  },
+
+  async restoreDraft(draft) {
+    if (!draft?.manifest_id || !draft?.ticket_id) {
+      clearDraft(this.draftScope);
+      return;
+    }
+    const opened = await this.openManifest(draft.manifest_id);
+    if (!opened) {
+      this.pendingDraft = draft;
+      return;
+    }
+    const ticket = (this.data.selectedManifest?.tickets || []).find(
+      (item) => item.ticket_id === draft.ticket_id,
+    );
+    if (!ticket || !['EXPECTED', 'PARTIAL'].includes(ticket.status)) {
+      clearDraft(this.draftScope);
+      clearSubmissionKey(
+        receiptSubmissionScope(this.data.session, draft.ticket_id),
+      );
+      wx.showModal({
+        title: '上次操作已处理',
+        content: '任务状态已经变化，草稿已清理。请按最新票货状态操作。',
+        showCancel: false,
+      });
+      return;
+    }
+    const scans = Array.isArray(draft.scans) ? draft.scans : [];
+    const progress = scanProgress(ticket, scans);
+    const remaining = numberText(remainingQuantity(ticket));
+    this.skipDraftPersist = false;
+    this.setData({
+      selectedTicket: ticket,
+      scans,
+      quantity: draft.quantity || remaining,
+      differenceReason: draft.difference_reason || '',
+      submitUncertain: Boolean(draft.submit_uncertain),
+      palletProgressText: progress.text,
+      remainingQuantityText: remaining,
+      nextSuffix: progress.remaining === null
+        ? '可继续拍摄下一托'
+        : progress.remaining > 0
+          ? `还差 ${progress.remaining} 托`
+          : '',
+    });
+    wx.showToast({ title: '已恢复上次收货草稿', icon: 'none' });
   },
 
   async openManifest(manifestId) {
@@ -119,8 +198,10 @@ Page({
         selectedTicket: null,
         scans: [],
       });
+      return true;
     } catch (error) {
       wx.showToast({ title: error.message, icon: 'none' });
+      return false;
     } finally {
       this.setData({ busy: false });
     }
@@ -131,6 +212,10 @@ Page({
   },
 
   startTicket(event) {
+    if (this.data.submitUncertain) {
+      wx.showToast({ title: '上次提交结果未确认，请先重试', icon: 'none' });
+      return;
+    }
     const ticketId = event.currentTarget.dataset.id;
     const ticket = this.data.selectedManifest.tickets.find(
       (item) => item.ticket_id === ticketId,
@@ -145,20 +230,29 @@ Page({
       0,
     );
     const progress = scanProgress(ticket, []);
+    if (this.data.selectedTicket) {
+      clearSubmissionKey(
+        receiptSubmissionScope(this.data.session, this.data.selectedTicket.ticket_id),
+      );
+    }
+    clearDraft(this.draftScope);
+    this.skipDraftPersist = false;
     this.setData({
       selectedTicket: ticket,
       scans: [],
       quantity: numberText(remaining),
       differenceReason: '',
+      submitUncertain: false,
       palletProgressText: progress.text,
       remainingQuantityText: numberText(remaining),
     });
+    this.persistDraft();
     wx.pageScrollTo({ selector: '#ticket-workbench', duration: 250 });
   },
 
   async captureLabel() {
     const ticket = this.data.selectedTicket;
-    if (!ticket || this.data.busy) return;
+    if (!ticket || this.data.busy || this.data.submitUncertain) return;
     this.setData({ busy: true });
     try {
       const media = await wx.chooseMedia({
@@ -216,6 +310,7 @@ Page({
         nextSuffix,
         palletProgressText: progress.text,
       });
+      this.persistDraft();
       wx.showToast({ title: `托盘 ${suffix} 已识别`, icon: 'success' });
     } catch (error) {
       if (error.errMsg && error.errMsg.includes('cancel')) return;
@@ -284,14 +379,19 @@ Page({
   },
 
   onQuantityInput(event) {
+    if (this.data.submitUncertain) return;
     this.setData({ quantity: event.detail.value });
+    this.persistDraft();
   },
 
   onDifferenceReasonInput(event) {
+    if (this.data.submitUncertain) return;
     this.setData({ differenceReason: event.detail.value });
+    this.persistDraft();
   },
 
   removeScan(event) {
+    if (this.data.submitUncertain) return;
     const suffix = event.currentTarget.dataset.suffix;
     const scans = this.data.scans.filter((item) => item.suffix !== suffix);
     const progress = scanProgress(this.data.selectedTicket, scans);
@@ -304,6 +404,7 @@ Page({
           ? `还差 ${progress.remaining} 托`
           : '',
     });
+    this.persistDraft();
   },
 
   previewScanPhoto(event) {
@@ -312,6 +413,22 @@ Page({
     wx.previewImage({
       current: localPath,
       urls: [localPath],
+    });
+  },
+
+  persistDraft() {
+    if (
+      this.skipDraftPersist
+      || !this.draftScope
+      || !this.data.selectedTicket
+    ) return;
+    writeDraft(this.draftScope, {
+      manifest_id: this.data.selectedManifestId,
+      ticket_id: this.data.selectedTicket.ticket_id,
+      scans: this.data.scans,
+      quantity: this.data.quantity,
+      difference_reason: this.data.differenceReason,
+      submit_uncertain: this.data.submitUncertain,
     });
   },
 
@@ -332,20 +449,33 @@ Page({
       });
       return;
     }
+    const submissionScope = receiptSubmissionScope(
+      this.data.session,
+      selectedTicket.ticket_id,
+    );
+    const submissionKey = getOrCreateSubmissionKey(
+      submissionScope,
+      'receipt',
+    );
     const body = buildReceiptConfirmation({
-      idempotencyKey: createIdempotencyKey('receipt'),
+      idempotencyKey: submissionKey,
       quantity,
       evidence: scans,
       differenceReason,
       deviceId: `wx-${this.data.session.user.username}`,
     });
-    this.setData({ busy: true });
+    this.skipDraftPersist = false;
+    this.setData({ busy: true, submitUncertain: false });
+    this.persistDraft();
     try {
       const result = await request({
         path: `/shipyard/inbound/tickets/${selectedTicket.ticket_id}/receipts`,
         method: 'POST',
         data: body,
       });
+      this.skipDraftPersist = true;
+      clearDraft(this.draftScope);
+      clearSubmissionKey(submissionScope);
       wx.showModal({
         title: '收货已完成',
         content: `${result.ticket.item_name}\n实收 ${result.ticket.received_quantity} 件\n区域 ${result.receipt.location_path_snapshot}`,
@@ -362,7 +492,34 @@ Page({
         },
       });
     } catch (error) {
-      wx.showToast({ title: error.message, icon: 'none' });
+      if (isAmbiguousSubmissionError(error)) {
+        this.skipDraftPersist = false;
+        this.setData({ submitUncertain: true });
+        this.persistDraft();
+        wx.showModal({
+          title: '提交结果未确认',
+          content: '网络中断或服务暂不可用，操作可能已经完成。请重试上次提交，系统不会重复入库。',
+          showCancel: false,
+          confirmText: '知道了',
+        });
+      } else if (error.statusCode === 409) {
+        this.skipDraftPersist = true;
+        clearDraft(this.draftScope);
+        clearSubmissionKey(submissionScope);
+        this.setData({ submitUncertain: false });
+        await this.loadManifests();
+        wx.showModal({
+          title: '状态已更新',
+          content: '该票货状态已经变化，已刷新最新任务。',
+          showCancel: false,
+        });
+      } else {
+        this.skipDraftPersist = false;
+        clearSubmissionKey(submissionScope);
+        this.setData({ submitUncertain: false });
+        this.persistDraft();
+        wx.showToast({ title: error.message, icon: 'none' });
+      }
     } finally {
       this.setData({ busy: false });
     }

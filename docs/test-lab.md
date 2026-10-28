@@ -55,6 +55,7 @@ docker exec sentry-api sh -c 'export FLASK_ENV=test SENTRY_ALLOW_HTTP_WEBHOOKS=f
 - 按 [`shipyard/ocr-acceptance.md`](shipyard/ocr-acceptance.md) 用真实脱敏吊牌
   样本测公网 OCR 的字段准确率、耗时和失败恢复，并保留仓库外报告；
 - 在微信真机测拍照、失败重试、弱网和原图上传；
+- 断开网络提交后重连，确认复用原幂等键；关闭页面再进入，确认已拍托盘草稿可恢复；
 - 验证小程序合法域名、HTTPS、AppID 和隐私声明；
 - 连续提交同一幂等键，确认不重复收货、扣库或装车；
 - 验证角色收回、跨仓库访问和只读账号均被拒绝；

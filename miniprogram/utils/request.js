@@ -88,7 +88,9 @@ function request(options) {
         if (response.statusCode === 401) {
           clearSession();
           wx.reLaunch({ url: '/pages/login/index' });
-          reject(new Error('登录已过期，请重新登录'));
+          const error = new Error('登录已过期，请重新登录');
+          error.statusCode = 401;
+          reject(error);
           return;
         }
         if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -102,7 +104,10 @@ function request(options) {
         resolve(response.data);
       },
       fail(error) {
-        reject(new Error(error.errMsg || '网络连接失败'));
+        const requestError = new Error(error.errMsg || '网络连接失败');
+        requestError.statusCode = 0;
+        requestError.networkError = true;
+        reject(requestError);
       },
     });
   });
@@ -128,7 +133,9 @@ function upload(options) {
         if (response.statusCode === 401) {
           clearSession();
           wx.reLaunch({ url: '/pages/login/index' });
-          reject(new Error('登录已过期，请重新登录'));
+          const error = new Error('登录已过期，请重新登录');
+          error.statusCode = 401;
+          reject(error);
           return;
         }
         if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -142,7 +149,10 @@ function upload(options) {
         resolve(data);
       },
       fail(error) {
-        reject(new Error(error.errMsg || '照片上传失败'));
+        const uploadError = new Error(error.errMsg || '照片上传失败');
+        uploadError.statusCode = 0;
+        uploadError.networkError = true;
+        reject(uploadError);
       },
     });
   });

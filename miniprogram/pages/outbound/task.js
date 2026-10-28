@@ -1,4 +1,3 @@
-const { createIdempotencyKey } = require('../../utils/idempotency');
 const { buildOutboundConfirmation } = require('../../utils/payload');
 const { request, upload } = require('../../utils/request');
 const {
@@ -6,6 +5,22 @@ const {
   normalizeSuffix,
 } = require('../../utils/pallet');
 const { requireSession } = require('../../utils/session');
+const {
+  clearDraft,
+  clearSubmissionKey,
+  getOrCreateSubmissionKey,
+  isAmbiguousSubmissionError,
+  readDraft,
+  writeDraft,
+} = require('../../utils/workflow');
+
+function outboundDraftScope(session, taskId) {
+  return `outbound:${session.user.username}:${taskId}`;
+}
+
+function outboundSubmissionScope(session, taskId) {
+  return `outbound-submit:${session.user.username}:${taskId}`;
+}
 
 Page({
   data: {
@@ -17,6 +32,7 @@ Page({
     scans: [],
     nextSuffix: '',
     busy: false,
+    submitUncertain: false,
     complete: false,
     can_confirm: false,
     suffixPickerVisible: false,
@@ -27,12 +43,23 @@ Page({
   onLoad(options) {
     const session = requireSession();
     if (!session) return;
+    this.skipDraftPersist = false;
     this.setData({
       session,
       taskId: options.taskId,
       orderId: options.orderId,
     });
+    this.draftScope = outboundDraftScope(session, options.taskId);
+    this.pendingDraft = readDraft(this.draftScope);
     this.loadTask();
+  },
+
+  onHide() {
+    this.persistDraft();
+  },
+
+  onUnload() {
+    this.persistDraft();
   },
 
   async loadTask() {
@@ -45,9 +72,40 @@ Page({
         (item) => item.task_id === this.data.taskId,
       );
       if (!task) throw new Error('出库任务不存在');
+      const draft = this.pendingDraft;
+      this.pendingDraft = null;
+      const hadDraft = Boolean(draft && draft.task_id === task.task_id);
+      let scans = hadDraft && Array.isArray(draft.scans)
+        ? draft.scans
+        : this.data.scans;
+      let submitUncertain = hadDraft
+        ? Boolean(draft.submit_uncertain)
+        : this.data.submitUncertain;
+      let pendingCapture = hadDraft ? (draft.pending_capture || null) : null;
+      let suffixChoices = hadDraft && Array.isArray(draft.suffix_choices)
+        ? draft.suffix_choices
+        : [];
+      if (task.status === 'OUTBOUND') {
+        if (hadDraft) {
+          wx.showToast({ title: '该票已完成出库，草稿已清理', icon: 'none' });
+        }
+        this.skipDraftPersist = true;
+        clearDraft(this.draftScope);
+        clearSubmissionKey(
+          outboundSubmissionScope(this.data.session, task.task_id),
+        );
+        scans = [];
+        submitUncertain = false;
+        pendingCapture = null;
+        suffixChoices = [];
+      } else if (pendingCapture) {
+        const completed = new Set(scans.map((item) => item.suffix));
+        suffixChoices = suffixChoices.filter((suffix) => !completed.has(suffix));
+        if (!suffixChoices.length) pendingCapture = null;
+      }
       const nextSuffix = chooseNextSuffix(
         task.expected_tag_suffixes,
-        this.data.scans.map((item) => item.suffix),
+        scans.map((item) => item.suffix),
       );
       const decoratedTask = {
         ...task,
@@ -57,8 +115,13 @@ Page({
         task: decoratedTask,
         order: data,
         nextSuffix,
+        scans,
+        submitUncertain,
+        pendingCapture,
+        suffixChoices,
+        suffixPickerVisible: Boolean(pendingCapture && suffixChoices.length),
+        can_confirm: scans.length === (task.expected_tag_suffixes || []).length,
         complete: (data.tasks || []).every((item) => item.status === 'OUTBOUND'),
-        scans: task.status === 'OUTBOUND' ? [] : this.data.scans,
       });
     } catch (error) {
       wx.showToast({ title: error.message, icon: 'none' });
@@ -68,8 +131,8 @@ Page({
   },
 
   async captureLabel() {
-    const { task, busy } = this.data;
-    if (!task || busy) return;
+    const { task, busy, submitUncertain } = this.data;
+    if (!task || busy || submitUncertain) return;
     if (task.status !== 'PENDING') {
       wx.showToast({ title: '该票已经完成出库', icon: 'none' });
       return;
@@ -132,6 +195,8 @@ Page({
       suffixChoices,
       pendingCapture: result,
     });
+    this.skipDraftPersist = false;
+    this.persistDraft();
   },
 
   selectSuffix(event) {
@@ -160,6 +225,8 @@ Page({
       suffixChoices: [],
       pendingCapture: null,
     });
+    this.skipDraftPersist = false;
+    this.persistDraft();
     wx.showToast({ title: '照片已留证，本次未计入核销', icon: 'none' });
   },
 
@@ -185,6 +252,8 @@ Page({
       nextSuffix,
       can_confirm: scans.length === task.expected_tag_suffixes.length,
     });
+    this.skipDraftPersist = false;
+    this.persistDraft();
     wx.showToast({ title: `托盘 ${suffix} 识别通过`, icon: 'success' });
   },
 
@@ -261,6 +330,7 @@ Page({
   },
 
   removeScan(event) {
+    if (this.data.submitUncertain) return;
     const suffix = event.currentTarget.dataset.suffix;
     const scans = this.data.scans.filter((item) => item.suffix !== suffix);
     this.setData({
@@ -271,6 +341,8 @@ Page({
       ),
       can_confirm: scans.length === this.data.task.expected_tag_suffixes.length,
     });
+    this.skipDraftPersist = false;
+    this.persistDraft();
   },
 
   previewScanPhoto(event) {
@@ -279,6 +351,18 @@ Page({
     wx.previewImage({
       current: localPath,
       urls: [localPath],
+    });
+  },
+
+  persistDraft() {
+    if (this.skipDraftPersist || !this.draftScope || !this.data.task) return;
+    writeDraft(this.draftScope, {
+      task_id: this.data.task.task_id,
+      order_id: this.data.orderId,
+      scans: this.data.scans,
+      pending_capture: this.data.pendingCapture,
+      suffix_choices: this.data.suffixChoices,
+      submit_uncertain: this.data.submitUncertain,
     });
   },
 
@@ -293,18 +377,31 @@ Page({
       });
       return;
     }
+    const submissionScope = outboundSubmissionScope(
+      this.data.session,
+      task.task_id,
+    );
+    const submissionKey = getOrCreateSubmissionKey(
+      submissionScope,
+      'outbound',
+    );
     const body = buildOutboundConfirmation(
-      createIdempotencyKey('outbound'),
+      submissionKey,
       scans,
       `wx-${this.data.session.user.username}`,
     );
-    this.setData({ busy: true });
+    this.skipDraftPersist = false;
+    this.setData({ busy: true, submitUncertain: false });
+    this.persistDraft();
     try {
       const result = await request({
         path: `/shipyard/outbound/tasks/${task.task_id}/confirm`,
         method: 'POST',
         data: body,
       });
+      this.skipDraftPersist = true;
+      clearDraft(this.draftScope);
+      clearSubmissionKey(submissionScope);
       wx.showModal({
         title: '整票出库完成',
         content: `扣减 ${result.confirmation.quantity} 件\n区域 ${result.confirmation.location_path_snapshot}\n出库单状态 ${result.order.status}`,
@@ -312,7 +409,34 @@ Page({
         success: () => wx.navigateBack(),
       });
     } catch (error) {
-      wx.showToast({ title: error.message, icon: 'none' });
+      if (isAmbiguousSubmissionError(error)) {
+        this.skipDraftPersist = false;
+        this.setData({ submitUncertain: true });
+        this.persistDraft();
+        wx.showModal({
+          title: '提交结果未确认',
+          content: '网络中断或服务暂不可用，整票可能已经扣库。请重试上次提交，系统不会重复扣库。',
+          showCancel: false,
+          confirmText: '知道了',
+        });
+      } else if (error.statusCode === 409) {
+        this.skipDraftPersist = true;
+        clearDraft(this.draftScope);
+        clearSubmissionKey(submissionScope);
+        this.setData({ submitUncertain: false });
+        await this.loadTask();
+        wx.showModal({
+          title: '状态已更新',
+          content: '该整票状态已经变化，已刷新最新出库信息。',
+          showCancel: false,
+        });
+      } else {
+        this.skipDraftPersist = false;
+        clearSubmissionKey(submissionScope);
+        this.setData({ submitUncertain: false });
+        this.persistDraft();
+        wx.showToast({ title: error.message, icon: 'none' });
+      }
     } finally {
       this.setData({ busy: false });
     }
