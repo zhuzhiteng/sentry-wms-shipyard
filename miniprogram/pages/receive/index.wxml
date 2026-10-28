@@ -54,7 +54,7 @@
         class="button-primary"
         data-id="{{item.ticket_id}}"
         bindtap="startTicket"
-        disabled="{{!item.can_receive}}"
+        disabled="{{!item.can_receive || submitUncertain || busy}}"
       >
         {{item.status === 'PARTIAL' ? '继续补收货' : '开始收货'}}
       </button>
@@ -84,11 +84,14 @@
         整票数量收满时，全部托盘必须齐套。
       </view>
       <view class="ocr-note">原图用于留证，并上传云端识别吊牌打印字段。</view>
+      <view wx:if="{{submitUncertain}}" class="uncertain-banner">
+        上次提交结果未确认。请重试上次收货，系统会复用同一提交编号，不会重复入库。
+      </view>
       <view wx:if="{{nextSuffix}}" class="next-suffix">{{nextSuffix}}</view>
       <button
         class="button-secondary"
         loading="{{busy}}"
-        disabled="{{busy}}"
+        disabled="{{busy || submitUncertain}}"
         bindtap="captureLabel"
       >
         拍摄识别吊牌
@@ -111,13 +114,24 @@
               <view class="scan-hint">点照片可核对原图</view>
             </view>
           </view>
-          <button class="mini-action" data-suffix="{{item.suffix}}" bindtap="removeScan">移除</button>
+          <button
+            class="mini-action"
+            data-suffix="{{item.suffix}}"
+            bindtap="removeScan"
+            disabled="{{submitUncertain}}"
+          >移除</button>
         </view>
       </view>
 
       <view class="field">
         <view class="label">本次实收数量（剩余应收 {{remainingQuantityText}}）</view>
-        <input class="input" type="digit" value="{{quantity}}" bindinput="onQuantityInput" />
+        <input
+          class="input"
+          type="digit"
+          value="{{quantity}}"
+          bindinput="onQuantityInput"
+          disabled="{{submitUncertain}}"
+        />
       </view>
       <view class="field">
         <view class="label">差异原因（本次少于剩余应收时必填）</view>
@@ -127,6 +141,7 @@
           value="{{differenceReason}}"
           bindinput="onDifferenceReasonInput"
           placeholder="例如：少 1 件，已联系工厂补货"
+          disabled="{{submitUncertain}}"
         />
       </view>
     </view>
@@ -137,7 +152,7 @@
         disabled="{{busy}}"
         bindtap="confirmReceipt"
       >
-        确认整票收货
+        {{submitUncertain ? '重试上次收货' : '确认整票收货'}}
       </button>
     </view>
   </view>

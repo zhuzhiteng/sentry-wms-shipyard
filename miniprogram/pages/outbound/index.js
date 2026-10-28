@@ -1,6 +1,11 @@
-const { createIdempotencyKey } = require('../../utils/idempotency');
 const { request } = require('../../utils/request');
 const { requireSession } = require('../../utils/session');
+const {
+  clearSubmissionKey,
+  getOrCreateSubmissionKey,
+  hasSubmissionKey,
+  isAmbiguousSubmissionError,
+} = require('../../utils/workflow');
 
 const STATUS_LABELS = {
   PENDING: '待出库',
@@ -22,6 +27,10 @@ function numberText(value) {
   return Number.isInteger(number) ? String(number) : number.toFixed(3);
 }
 
+function loadingSubmissionScope(session, orderId) {
+  return `loading-submit:${session.user.username}:${orderId}`;
+}
+
 Page({
   data: {
     session: null,
@@ -32,6 +41,7 @@ Page({
     filter: 'pending',
     visibleTasks: [],
     busy: false,
+    loadingUncertain: false,
     loading: false,
   },
 
@@ -96,9 +106,21 @@ Page({
         batch_text: (task.pallets || [])[0]?.batch_no || '—',
       }));
       const selectedOrder = { ...data, tasks };
+      const loadingScope = loadingSubmissionScope(
+        this.data.session,
+        data.order.outbound_order_id,
+      );
+      let loadingUncertain = this.data.loadingUncertain;
+      if (data.order.status === 'LOADED') {
+        loadingUncertain = false;
+        clearSubmissionKey(loadingScope);
+      } else if (data.order.status === 'OUTBOUND') {
+        loadingUncertain = hasSubmissionKey(loadingScope);
+      }
       this.setData({
         selectedOrder,
         selectedOrderId: selectedOrder.order.outbound_order_id,
+        loadingUncertain,
       });
       this.applyFilter(this.data.filter, selectedOrder);
     } catch (error) {
@@ -142,25 +164,34 @@ Page({
   confirmLoading() {
     const order = this.data.selectedOrder;
     if (!order || order.order.status !== 'OUTBOUND') return;
+    const submissionScope = loadingSubmissionScope(
+      this.data.session,
+      order.order.outbound_order_id,
+    );
     wx.showModal({
-      title: '确认整单装车',
+      title: this.data.loadingUncertain ? '重试确认整单装车' : '确认整单装车',
       content: '',
       editable: true,
       placeholderText: '可填写车辆、司机或交接备注',
       confirmText: '确认装车',
       success: async (result) => {
         if (!result.confirm) return;
+        const submissionKey = getOrCreateSubmissionKey(
+          submissionScope,
+          'loading',
+        );
         this.setData({ busy: true });
         try {
           const data = await request({
             path: `/shipyard/outbound/orders/${order.order.outbound_order_id}/loading`,
             method: 'POST',
             data: {
-              idempotency_key: createIdempotencyKey('loading'),
+              idempotency_key: submissionKey,
               client_device_id: `wx-${this.data.session.user.username}`,
               notes: result.content || '',
             },
           });
+          clearSubmissionKey(submissionScope);
           wx.showToast({ title: '装车已确认', icon: 'success' });
           this.setData({
             selectedOrder: {
@@ -175,10 +206,31 @@ Page({
               })),
             },
             selectedOrderId: data.order.outbound_order_id,
+            loadingUncertain: false,
           });
           await this.loadOrders();
         } catch (error) {
-          wx.showToast({ title: error.message, icon: 'none' });
+          if (isAmbiguousSubmissionError(error)) {
+            this.setData({ loadingUncertain: true });
+            wx.showModal({
+              title: '装车结果未确认',
+              content: '网络中断或服务暂不可用，装车可能已经完成。请再次点击确认装车，系统会复用同一提交编号。',
+              showCancel: false,
+            });
+          } else if (error.statusCode === 409) {
+            clearSubmissionKey(submissionScope);
+            this.setData({ loadingUncertain: false });
+            await this.loadOrders();
+            wx.showModal({
+              title: '状态已更新',
+              content: '出库单状态已经变化，已刷新最新装车信息。',
+              showCancel: false,
+            });
+          } else {
+            clearSubmissionKey(submissionScope);
+            this.setData({ loadingUncertain: false });
+            wx.showToast({ title: error.message, icon: 'none' });
+          }
         } finally {
           this.setData({ busy: false });
         }

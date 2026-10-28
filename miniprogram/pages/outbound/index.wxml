@@ -76,9 +76,12 @@
       </view>
     </view>
 
+    <view wx:if="{{loadingUncertain}}" class="uncertain-banner">
+      上次装车确认结果未确认。请再次点击确认装车，系统会复用同一提交编号，不会重复写入。
+    </view>
     <view wx:if="{{selectedOrder.order.status === 'OUTBOUND'}}" class="sticky-actions">
       <button class="button-primary" bindtap="confirmLoading" loading="{{busy}}" disabled="{{busy}}">
-        确认整单装车
+        {{loadingUncertain ? '重试确认整单装车' : '确认整单装车'}}
       </button>
     </view>
     <view wx:elif="{{selectedOrder.order.status === 'LOADED'}}" class="loading-done">

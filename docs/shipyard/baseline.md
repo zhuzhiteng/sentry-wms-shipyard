@@ -34,6 +34,7 @@
 - 一张吊牌只拍一次，原图同时用于留证和 OCR；
 - OCR 结果不能直接落库存，必须通过服务端字段校验；
 - 同一请求重试不能重复收货、扣库或装车。
+- 客户端在结果未确认时必须复用原幂等键，不能重新生成提交编号。
 
 ## 已删除的非首期实现
 
@@ -66,7 +67,7 @@
 - 交付 PR：`https://github.com/zhuzhiteng/sentry-wms-shipyard/pull/1`；
 - 后端全量：`3037 passed, 55 skipped, 11 warnings`；
 - 管理端：33 个测试文件、201 项通过，生产构建通过；
-- 微信小程序：15 项通过；
+- 微信小程序：34 项通过；
 - PR required checks：Tests `40706673891`、Dependency Audit `40706673580`、
   gitleaks `40706673621`、Lockfile Version Check `40706673906` 全部通过；
 - 本交付没有生产部署、真实 OCR、微信真机或船厂 UAT 证据。

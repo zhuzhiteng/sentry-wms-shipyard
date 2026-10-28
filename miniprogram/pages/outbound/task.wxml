@@ -36,11 +36,14 @@
         class="button-secondary"
         bindtap="captureLabel"
         loading="{{busy}}"
-        disabled="{{busy || !nextSuffix}}"
+        disabled="{{busy || submitUncertain || !nextSuffix}}"
       >
         拍摄识别当前吊牌
       </button>
       <view class="ocr-note">原图用于留证，并上传云端识别吊牌打印字段。</view>
+      <view wx:if="{{submitUncertain}}" class="uncertain-banner">
+        上次提交结果未确认。请重试上次整票出库，系统会复用同一提交编号，不会重复扣库。
+      </view>
     </view>
 
     <view class="section-title">已识别吊牌</view>
@@ -66,7 +69,12 @@
         <text>照片 OCR 已读取并校验物料身份及托盘后缀</text>
         <text>原照片已上传并绑定当前任务</text>
       </view>
-      <button class="remove-button" data-suffix="{{item.suffix}}" bindtap="removeScan">重拍此托</button>
+      <button
+        class="remove-button"
+        data-suffix="{{item.suffix}}"
+        bindtap="removeScan"
+        disabled="{{submitUncertain}}"
+      >重拍此托</button>
     </view>
 
     <view class="sticky-actions">
@@ -76,7 +84,7 @@
         loading="{{busy}}"
         disabled="{{busy || !can_confirm}}"
       >
-        确认整票已出库
+        {{submitUncertain ? '重试上次整票出库' : '确认整票已出库'}}
       </button>
     </view>
   </block>
@@ -92,6 +100,7 @@
           class="suffix-choice"
           data-suffix="{{item}}"
           bindtap="selectSuffix"
+          disabled="{{submitUncertain}}"
         >
           托盘 {{item}}
         </button>
