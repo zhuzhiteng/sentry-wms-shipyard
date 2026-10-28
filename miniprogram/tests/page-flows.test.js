@@ -404,6 +404,53 @@ test('receiving restores an unsent draft after the page is reopened', async () =
   assert.equal(page.data.differenceReason, '少 2 件，余货补发');
 });
 
+test('starting a new receipt clears a stale successful submission key', () => {
+  const session = {
+    user: { username: 'receiver' },
+    warehouseId: 1,
+  };
+  installMock('utils/session.js', {
+    requireSession: () => session,
+  });
+  installMock('utils/request.js', {
+    request: async () => ({}),
+    upload: async () => ({}),
+  });
+  global.wx = {
+    showToast: () => {},
+    pageScrollTo: () => {},
+  };
+  installMemoryStorage(global.wx);
+
+  const page = instantiate(loadPage('pages/receive/index.js'));
+  page.data.session = session;
+  page.draftScope = 'receipt:receiver:1';
+  page.data.selectedManifest = {
+    tickets: [{
+      ticket_id: 'ticket-1',
+      status: 'PARTIAL',
+      declared_quantity: '4.000',
+      received_quantity: '2.000',
+      expected_pallet_count: 2,
+      pallet_count: 1,
+    }],
+  };
+  const workflow = require('../utils/workflow');
+  workflow.getOrCreateSubmissionKey(
+    'receipt-submit:receiver:ticket-1',
+    'receipt',
+  );
+
+  page.startTicket({
+    currentTarget: { dataset: { id: 'ticket-1' } },
+  });
+
+  assert.equal(
+    workflow.hasSubmissionKey('receipt-submit:receiver:ticket-1'),
+    false,
+  );
+});
+
 test('outbound restores photographed pallets before confirmation', async () => {
   const session = {
     user: { username: 'outbound' },

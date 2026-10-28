@@ -234,6 +234,9 @@ Page({
       0,
     );
     const progress = scanProgress(ticket, []);
+    clearSubmissionKey(
+      receiptSubmissionScope(this.data.session, ticket.ticket_id),
+    );
     if (this.data.selectedTicket) {
       clearSubmissionKey(
         receiptSubmissionScope(this.data.session, this.data.selectedTicket.ticket_id),

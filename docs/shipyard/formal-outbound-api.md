@@ -265,7 +265,7 @@ HTTPS API 域名、微信 request/uploadFile 合法域名和真实 AppID。
 - 087、088、089 迁移在 `sentry_test` 连续执行两次成功；
 - 全新空库执行 `db/schema.sql` 后，正式出库、任务、核销和装车 4 类核心表均存在；
 - 管理端：干净 Node 20 依赖树中 33 个测试文件、201 项测试通过，生产构建通过；
-- 微信小程序：31 项 Node 测试通过；
+- 微信小程序：32 项 Node 测试通过；
 - 触及 Python 文件 Ruff、格式检查、Bandit 和 `git diff --check` 通过；
 - `pip-audit` 无已知漏洞，`npm audit` 为 0 个漏洞；
 - gitleaks 8.21.2 扫描 767 个提交，无泄漏；MkDocs 严格构建通过。

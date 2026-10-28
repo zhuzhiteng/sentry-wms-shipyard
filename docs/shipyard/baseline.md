@@ -67,7 +67,7 @@
 - 交付 PR：`https://github.com/zhuzhiteng/sentry-wms-shipyard/pull/1`；
 - 后端全量：`3037 passed, 55 skipped, 11 warnings`；
 - 管理端：33 个测试文件、201 项通过，生产构建通过；
-- 微信小程序：31 项通过；
+- 微信小程序：32 项通过；
 - PR required checks：Tests `40706673891`、Dependency Audit `40706673580`、
   gitleaks `40706673621`、Lockfile Version Check `40706673906` 全部通过；
 - 本交付没有生产部署、真实 OCR、微信真机或船厂 UAT 证据。
