@@ -84,12 +84,14 @@ node --test miniprogram/tests/*.test.js
 - [正式出库与装车](docs/shipyard/formal-outbound-api.md)
 - [真实吊牌 OCR 验收](docs/shipyard/ocr-acceptance.md)
 - [备份恢复演练](docs/shipyard/recovery-drill.md)
+- [生产监控与定时备份](docs/shipyard/production-operations.md)
 - [风险闭环台账](docs/shipyard/risk-register.md)
 
 ## 状态边界
 
 自动测试和 HTTP E2E 已覆盖核心业务事务。真实百度 OCR 样本、微信真机与合法域名、
-现场 UAT 和生产部署仍属于外部验收项；完成前生产结论保持 `NO-GO`。
+现场 UAT 和生产部署仍属于外部验收项。监控告警与定时备份 sidecar 已实现，但生产
+HTTPS webhook、首次计划备份和隔离恢复仍未部署验收；完成前生产结论保持 `NO-GO`。
 
 ## 许可
 

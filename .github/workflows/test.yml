@@ -50,6 +50,19 @@ jobs:
       - name: Run mini-program tests
         run: node --test miniprogram/tests/*.test.js
 
+      - name: Validate operations Compose overlay
+        run: >-
+          docker compose --env-file .env.example
+          -f docker-compose.yml
+          -f docker-compose.ops.yml
+          config --quiet
+
+      - name: Build PostgreSQL 16-compatible backup image
+        run: |
+          docker build -t sentry-wms-ops-backup:ci -f ops/backup.Dockerfile .
+          docker run --rm sentry-wms-ops-backup:ci pg_dump --version | grep -Eq 'PostgreSQL\) 16\.'
+          docker run --rm sentry-wms-ops-backup:ci pg_restore --version | grep -Eq 'PostgreSQL\) 16\.'
+
       - name: Install dependencies
         run: pip install -r api/requirements.txt
 

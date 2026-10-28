@@ -188,6 +188,18 @@ Use `docker-compose.prod.yml` which has no source volume mounts:
 docker compose -f docker-compose.prod.yml up -d
 ```
 
+生产还需要叠加监控告警和定时备份 sidecar：
+
+```bash
+docker compose \
+  -f docker-compose.prod.yml \
+  -f docker-compose.ops.yml \
+  up -d
+```
+
+配置、告警阈值、备份计划、保留策略和恢复验证见
+[`shipyard/production-operations.md`](shipyard/production-operations.md)。
+
 Key differences from the dev compose:
 
 - No `./api:/app`, `./db:/db`, or `./admin:/app` volume mounts

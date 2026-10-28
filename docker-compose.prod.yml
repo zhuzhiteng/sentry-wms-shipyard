@@ -3,6 +3,7 @@ services:
   db:
     image: postgres:16
     container_name: sentry-db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -19,24 +20,52 @@ services:
       retries: 5
 
   api:
-    build: ./api
+    build:
+      context: .
+      dockerfile: ./api/Dockerfile
     container_name: sentry-api
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-sentry}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      JWT_CLOCK_SKEW_SECONDS: ${JWT_CLOCK_SKEW_SECONDS:-5}
       SENTRY_ENCRYPTION_KEY: ${SENTRY_ENCRYPTION_KEY:?Set SENTRY_ENCRYPTION_KEY in .env}
+      SENTRY_TOKEN_PEPPER: ${SENTRY_TOKEN_PEPPER:?Set SENTRY_TOKEN_PEPPER in .env}
+      SENTRY_PUBSUB_HMAC_KEY: ${SENTRY_PUBSUB_HMAC_KEY:?Set SENTRY_PUBSUB_HMAC_KEY in .env}
       FLASK_ENV: production
       FLASK_PORT: 5000
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      API_BIND_HOST: ${API_BIND_HOST:-127.0.0.1}
       CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in .env}
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379/0
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379/0
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379/0
+      SHIPYARD_OCR_PROVIDER: ${SHIPYARD_OCR_PROVIDER:-baidu}
+      BAIDU_OCR_API_KEY: ${BAIDU_OCR_API_KEY:-}
+      BAIDU_OCR_SECRET_KEY: ${BAIDU_OCR_SECRET_KEY:-}
+      SHIPYARD_OCR_REQUIRED_FIELDS: ${SHIPYARD_OCR_REQUIRED_FIELDS:-material_code,item_name,tag_suffix}
+      SHIPYARD_OCR_TOKEN_TIMEOUT_S: ${SHIPYARD_OCR_TOKEN_TIMEOUT_S:-10}
+      SHIPYARD_OCR_TIMEOUT_S: ${SHIPYARD_OCR_TIMEOUT_S:-20}
+      SENTRY_INBOUND_SOURCE_PAYLOAD_RETENTION_DAYS: ${SENTRY_INBOUND_SOURCE_PAYLOAD_RETENTION_DAYS:-90}
+      SENTRY_INBOUND_MAX_BODY_KB: ${SENTRY_INBOUND_MAX_BODY_KB:-256}
+      SENTRY_INBOUND_MAPPINGS_DIR: /app/db/mappings
     ports:
-      - "5000:5000"
+      - "${API_BIND_HOST:-127.0.0.1}:5000:5000"
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/health', timeout=3)
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   redis:
     image: redis:7-alpine
@@ -52,7 +81,9 @@ services:
       retries: 3
 
   celery-worker:
-    build: ./api
+    build:
+      context: .
+      dockerfile: ./api/Dockerfile
     container_name: sentry-celery
     command: celery -A jobs worker --loglevel=info
     restart: unless-stopped
@@ -68,12 +99,16 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-sentry}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       SENTRY_ENCRYPTION_KEY: ${SENTRY_ENCRYPTION_KEY:?Set SENTRY_ENCRYPTION_KEY in .env}
+      SENTRY_TOKEN_PEPPER: ${SENTRY_TOKEN_PEPPER:?Set SENTRY_TOKEN_PEPPER in .env}
+      SENTRY_PUBSUB_HMAC_KEY: ${SENTRY_PUBSUB_HMAC_KEY:?Set SENTRY_PUBSUB_HMAC_KEY in .env}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379/0
 
   admin:
     build: ./admin
     container_name: sentry-admin
+    restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${ADMIN_BIND_HOST:-127.0.0.1}:8080:8080"
     depends_on:
       - api
 
