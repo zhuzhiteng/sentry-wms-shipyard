@@ -58,6 +58,8 @@ docker exec sentry-api sh -c 'export FLASK_ENV=test SENTRY_ALLOW_HTTP_WEBHOOKS=f
 - 验证小程序合法域名、HTTPS、AppID 和隐私声明；
 - 连续提交同一幂等键，确认不重复收货、扣库或装车；
 - 验证角色收回、跨仓库访问和只读账号均被拒绝；
+- 按 [`shipyard/recovery-drill.md`](shipyard/recovery-drill.md) 做独立库备份、
+  恢复、迁移重放和 API 启动演练；
 - 由仓库和船厂完成至少一轮真实 UAT。
 
 未完成上述专项时，只能声明“代码与模拟验证通过”，不能声明“生产可用”。
