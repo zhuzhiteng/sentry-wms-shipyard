@@ -1,0 +1,1378 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="船厂到货、库存、正式出库与装车追溯">
+      
+      
+      
+        <link rel="canonical" href="https://zhuzhiteng.github.io/sentry-wms-shipyard/shipyard/formal-outbound-api/">
+      
+      
+        <link rel="prev" href="../receipt-api/">
+      
+      
+        <link rel="next" href="../ocr-acceptance/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>正式出库与装车 - 船厂仓储管理系统</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Instrument+Sans:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Instrument Sans";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#api" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="船厂仓储管理系统" class="md-header__button md-logo" aria-label="船厂仓储管理系统" data-md-component="logo">
+      
+  <img src="../../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            船厂仓储管理系统
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              正式出库与装车
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/zhuzhiteng/sentry-wms-shipyard" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zhuzhiteng/sentry-wms-shipyard
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="船厂仓储管理系统" class="md-nav__button md-logo" aria-label="船厂仓储管理系统" data-md-component="logo">
+      
+  <img src="../../assets/logo.png" alt="logo">
+
+    </a>
+    船厂仓储管理系统
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/zhuzhiteng/sentry-wms-shipyard" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zhuzhiteng/sentry-wms-shipyard
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    部署
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    船厂仓储
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    船厂仓储
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../baseline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    基线与状态
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inbound-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    入库清单
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../receipt-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    拍照识别收货
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    正式出库与装车
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    正式出库与装车
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        数据边界
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        物料与库存强校验
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        出库清单识别
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="出库清单识别">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        上传预览
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        查询、原文件和生命周期
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        正式出库单和移动任务
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        整票吊牌拍照识别与留证
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="整票吊牌拍照识别与留证">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        拍摄并识别当前吊牌
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        确认整票出库
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        装车确认
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        微信小程序
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        当前限制
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        验证
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ocr-acceptance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    真实吊牌 OCR 验收
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../recovery-drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    备份恢复演练
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../production-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    生产监控与备份
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../risk-register/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    风险闭环台账
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../test-lab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    测试手册
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    贡献指南
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        数据边界
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        物料与库存强校验
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        出库清单识别
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="出库清单识别">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        上传预览
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        查询、原文件和生命周期
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        正式出库单和移动任务
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        整票吊牌拍照识别与留证
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="整票吊牌拍照识别与留证">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        拍摄并识别当前吊牌
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        确认整票出库
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        装车确认
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        微信小程序
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        当前限制
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        验证
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="api">船厂正式出库、整票核销与装车 API（第四切片）</h1>
+<p>本文记录船厂固定出库清单识别、库存分配、整票多吊牌拍照识别、照片留证、库存扣减、
+装车确认和微信小程序接口。所有接口位于 <code>/api/shipyard/outbound</code>，复用 Sentry
+的登录、角色、仓库权限、审计日志和数据库事务。</p>
+<h2 id="_1">数据边界</h2>
+<p>086 新增两层独立单据：</p>
+<ul>
+<li><code>shipyard_outbound_manifests</code>：船厂下发的原始出库需求，保留原文件、模板版本、
+  清单行和库存匹配预览。</li>
+<li><code>shipyard_outbound_orders</code>：管理员确认后生成的正式出库单，包含不可拆的整票
+  <code>shipyard_outbound_tasks</code>。</li>
+</ul>
+<p>票据层级如下：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>船厂正式出库清单
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  → 正式出库单
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    → 出库需求行
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>      → 1..N 张整票任务（每张任务对应一个 cargo ticket）
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        → 全部托盘吊牌照片
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>          → 一次库存扣减
+</code></pre></div>
+<p>清单确认只把票货置为 <code>ALLOCATED</code>，不改变库存数量。只有现场拍齐全部托盘吊牌、
+OCR 字段全部通过并与当前票货一致后提交整票核销时，才在同一事务中扣减
+<code>on_hand_quantity</code>、写库存流水、更新照片和出库单状态。</p>
+<h2 id="_2">物料与库存强校验</h2>
+<p>正式出库清单的以下字段必须存在：</p>
+<ul>
+<li>船号；</li>
+<li>工程号；</li>
+<li>制作图编号；</li>
+<li>物料编码；</li>
+<li>物料名称；</li>
+<li>需求数量。</li>
+</ul>
+<p>库存匹配同时要求：</p>
+<ul>
+<li>船号/工程号/制作图命中当前生效的项目绑定；</li>
+<li><code>material_code</code>、<code>item_name</code>、<code>item_spec</code> 规范化后完全一致；</li>
+<li>票货有可用在库数量；</li>
+<li>全部实际托盘后缀存在、唯一且属于同一票货；</li>
+<li>出库清单给出的预计托盘数和托盘后缀与库存一致；</li>
+<li>一张票货只分配一次，不能跨出库任务复用。</li>
+</ul>
+<p>系统不会按品名静默建立 SKU，也不会在物料编码缺失时退化为品名匹配。历史入库票货
+若没有物料编码，会在预览中显示为无匹配，需先补齐来源数据或走受控调整。</p>
+<h2 id="_3">出库清单识别</h2>
+<h3 id="_4">上传预览</h3>
+<p><code>POST /api/shipyard/outbound/formal-manifests/preview</code></p>
+<p>使用 <code>multipart/form-data</code>：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>warehouse_id</code></td>
+<td>是</td>
+<td>所属仓库</td>
+</tr>
+<tr>
+<td><code>file</code></td>
+<td>是</td>
+<td>固定模板 <code>.xlsx</code>，最大 10 MiB</td>
+</tr>
+<tr>
+<td><code>factory_shipment_no</code></td>
+<td>否</td>
+<td>文件未提供船厂出货单号时补充</td>
+</tr>
+<tr>
+<td><code>manifest_no</code></td>
+<td>否</td>
+<td>内部导入号；不填则自动生成</td>
+</tr>
+</tbody>
+</table>
+<p>固定模板至少需要识别：</p>
+<ul>
+<li>清单行号；</li>
+<li>船厂出货单号；</li>
+<li>船号、工程号、制作图号；</li>
+<li>物料编码、物料名称、规格；</li>
+<li>需求数量、单位、需求日期；</li>
+<li>预计托盘数、托盘后缀。</li>
+</ul>
+<p>接口返回逐行绑定状态、候选整票、区域快照、托盘后缀和库存缺口。同一文件
+SHA-256 或未作废的内部导入号重复时返回 <code>409</code>。</p>
+<h3 id="_5">查询、原文件和生命周期</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>GET  /api/shipyard/outbound/formal-manifests?warehouse_id=1
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>GET  /api/shipyard/outbound/formal-manifests/&lt;manifest_id&gt;
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>GET  /api/shipyard/outbound/formal-manifests/&lt;manifest_id&gt;/file
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>POST /api/shipyard/outbound/formal-manifests/&lt;manifest_id&gt;/confirm
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>POST /api/shipyard/outbound/formal-manifests/&lt;manifest_id&gt;/void
+</code></pre></div>
+<p>确认接口无编辑字段，使用服务端重新计算后的分配结果生成正式出库单。库存不足不会
+被写成负库存；没有合适整票的需求行保留 <code>SHORTAGE</code>。已生成出库单的清单不能作废。</p>
+<h2 id="_6">正式出库单和移动任务</h2>
+<p>管理端查询：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>GET /api/shipyard/outbound/orders?warehouse_id=1
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>GET /api/shipyard/outbound/orders/&lt;outbound_order_id&gt;
+</code></pre></div>
+<p>小程序查询：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>GET /api/shipyard/outbound/mobile/orders?warehouse_id=1
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>GET /api/shipyard/outbound/mobile/orders/&lt;outbound_order_id&gt;
+</code></pre></div>
+<p>移动端接口同时校验角色和 <code>shipyard-outbound</code> 页面权限。列表、详情、吊牌拍照识别、
+整票确认、装车确认和出库照片下载都受同一门禁保护；只有 <code>OUTBOUND</code> 角色但没有
+页面权限时返回 <code>403</code>。知道有效的任务或照片 ID 也不能绕过页面权限。</p>
+<p>出库单状态：</p>
+<ul>
+<li><code>PENDING</code>：已生成，等待现场出库；</li>
+<li><code>PARTIAL</code>：多张整票中部分已完成，或仍有库存缺口；</li>
+<li><code>OUTBOUND</code>：全部已分配整票完成且无缺口；</li>
+<li><code>LOADED</code>：整单装车已确认。</li>
+</ul>
+<p>单张任务只有 <code>PENDING → OUTBOUND</code>，不存在单票部分出库。</p>
+<h2 id="_7">整票吊牌拍照识别与留证</h2>
+<p>现场不使用二维码、条码或扫码设备。正常路径是每托拍一张吊牌原图，原图留证，
+同时由公网 OCR 识别吊牌打印字段。二维码内容不解析、不保存，也不参与业务匹配。</p>
+<h3 id="_8">拍摄并识别当前吊牌</h3>
+<p><code>POST /api/shipyard/outbound/tasks/&lt;task_id&gt;/label-recognition</code></p>
+<p>使用 <code>multipart/form-data</code> 上传一个 <code>file</code>：JPEG、PNG 或 WebP，最大 10 MiB。</p>
+<p>服务端按以下顺序处理：</p>
+<ol>
+<li>原图写入 <code>shipyard_photos</code>；</li>
+<li>调用配置的 OCR 服务识别打印文字；</li>
+<li>保存原始文字、结构化字段、提供商、置信度和失败原因；</li>
+<li>与当前出库任务的物料编码、品名、整票数量及托盘后缀比对；</li>
+<li>返回字段冲突、是否需要补选托盘后缀，以及其他票货的候选任务。</li>
+</ol>
+<p>成功响应示例：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">"matched"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">"needs_suffix"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">"recognized"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">"material_code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"MAT-001"</span><span class="p">,</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="nt">"item_name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"船用支架"</span><span class="p">,</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="nt">"batch_no"</span><span class="p">:</span><span class="w"> </span><span class="s2">"H1613-B01"</span><span class="p">,</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">    </span><span class="nt">"tag_suffix"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1-1"</span><span class="p">,</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">    </span><span class="nt">"label_quantity"</span><span class="p">:</span><span class="w"> </span><span class="s2">"4"</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">  </span><span class="nt">"mismatches"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">  </span><span class="nt">"candidate_tasks"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">  </span><span class="nt">"photo"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">    </span><span class="nt">"photo_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="p">,</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">    </span><span class="nt">"file_sha256"</span><span class="p">:</span><span class="w"> </span><span class="s2">"..."</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="w">  </span><span class="nt">"recognition"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="w">    </span><span class="nt">"recognition_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"11111111-1111-1111-1111-111111111111"</span><span class="p">,</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="w">    </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"MATCHED"</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="p">}</span>
+</code></pre></div>
+<p>默认强制字段由 <code>SHIPYARD_OCR_REQUIRED_FIELDS</code> 配置，出库默认是
+<code>material_code,item_name,tag_suffix</code>。任务清单有 <code>item_spec</code> 时，规格自动成为
+强制字段。字段一旦识别到就必须与任务完全一致；未识别到强制字段时返回
+<code>mismatches[].reason=REQUIRED</code>，不能用任务快照代替吊牌值。</p>
+<p>如果 OCR 只漏读托盘后缀，接口返回 <code>needs_suffix=true</code> 和本任务全部托盘后缀。
+小程序从“尚未拍摄的后缀”中选择实际托盘，不再要求重打整张吊牌。照片已经保存，
+正式确认时仍会重新验证 OCR 字段、照片、托盘和任务。</p>
+<p>如果吊牌物料编码和品名命中另一张待出库任务，响应中的
+<code>candidate_tasks</code> 给出任务号、出库单号和任务 ID，小程序可直接跳转到正确任务。</p>
+<p>OCR 服务未配置或暂时不可用时，照片和 <code>FAILED</code> 识别记录仍会保存，接口分别返回
+<code>503 ocr_unavailable</code> 或 <code>502 ocr_provider_error</code>。失败记录不能用于核销。</p>
+<h2 id="_9">确认整票出库</h2>
+<p><code>POST /api/shipyard/outbound/tasks/&lt;task_id&gt;/confirm</code></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">"idempotency_key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"outbound-20261027-0001"</span><span class="p">,</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">"client_device_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"WX-MINI-001"</span><span class="p">,</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">"pallets"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="p">{</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="nt">"tag_suffix"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1-1"</span><span class="p">,</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">      </span><span class="nt">"label_recognition_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"11111111-1111-1111-1111-111111111111"</span><span class="p">,</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">      </span><span class="nt">"photo_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">    </span><span class="p">},</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">    </span><span class="p">{</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">      </span><span class="nt">"tag_suffix"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1-2"</span><span class="p">,</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">      </span><span class="nt">"label_recognition_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"22222222-2222-2222-2222-222222222222"</span><span class="p">,</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">      </span><span class="nt">"photo_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"11111111-1111-1111-1111-111111111111"</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="w">  </span><span class="p">]</span>
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="p">}</span>
+</code></pre></div>
+<p>事务顺序：</p>
+<ol>
+<li>锁定任务、票货和全部托盘；</li>
+<li>校验已拍照托盘后缀集合与任务托盘集合完全相等，缺托、多托、重复托均拒绝；</li>
+<li>校验每托 OCR 记录、强制字段、批次、照片归属和照片唯一性；</li>
+<li>写一条出库核销记录和逐托关联记录；</li>
+<li>将票货 <code>on_hand_quantity</code> 置零、状态改为 <code>OUTBOUND</code>，全部托盘改为
+   <code>OUTBOUND</code>；</li>
+<li>写一条负数库存流水和审计日志；</li>
+<li>更新需求行、整票任务和整单状态。</li>
+</ol>
+<p>任一步失败整笔回滚。同一任务用相同幂等键重试返回首次结果；使用新键重复核销返回
+<code>409 outbound_state_conflict</code>。小程序在发出请求前持久化键值和“提交中”标记；
+应用在请求期间被系统中断时，重开页面按“结果未确认”恢复。网络中断、<code>408</code>
+或 <code>5xx</code> 后复用原键重试；已拍托盘草稿可跨页面重开恢复，遇到 <code>409</code> 时清理
+旧草稿并重新读取服务端状态。</p>
+<h2 id="_10">装车确认</h2>
+<p><code>POST /api/shipyard/outbound/orders/&lt;outbound_order_id&gt;/loading</code></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">"idempotency_key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"loading-20261027-0001"</span><span class="p">,</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">"client_device_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"WX-MINI-001"</span><span class="p">,</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">"notes"</span><span class="p">:</span><span class="w"> </span><span class="s2">"车辆沪A12345，两托已装车"</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="p">}</span>
+</code></pre></div>
+<p>只有全部整票任务完成且所有需求行无库存缺口时，整单才处于 <code>OUTBOUND</code> 并允许装车。
+确认后写 <code>shipyard_outbound_loading_confirmations</code>，状态变为 <code>LOADED</code>，记录装车人、
+装车时间、设备和备注。装车动作不改库存，不得与逐票出库合并。</p>
+<h2 id="_11">微信小程序</h2>
+<p><code>miniprogram/</code> 提供：</p>
+<ul>
+<li>收货任务与整票连续拍摄；</li>
+<li>出库单、整票任务和区域路径；</li>
+<li>逐托拍吊牌、公网 OCR 字段比对和原图留证；</li>
+<li>整票核销和整单装车确认。</li>
+</ul>
+<p>小程序使用 <code>/api/auth/login</code> 获取现有 JWT，不创建第二套用户。正式部署须配置
+HTTPS API 域名、微信 request/uploadFile 合法域名和真实 AppID。</p>
+<h2 id="_12">当前限制</h2>
+<ul>
+<li>船厂库存仍以 <code>shipyard_cargo_tickets</code>/<code>shipyard_stock_ledger</code> 为权威账，尚未
+  同步到 Sentry 通用 <code>items</code>/<code>inventory</code> 聚合表。</li>
+<li>当前没有主管异常强出、撤销装车和撤销出库审批流；相关入口保留为后续切片。</li>
+<li>公网 OCR 会把吊牌原图发送到所配置的云服务，现场需知悉该数据流向；</li>
+<li>首期只接百度通用高精度文字识别，真实吊牌识别率需用现场样本验证和调优；</li>
+<li>当前自动化测试使用固定 OCR 结果，未使用真实百度凭据，不能把 mock 结果当成现场
+  识别率验收；</li>
+<li>固定模板字段别名覆盖常见船厂表头，但正式上线前仍需用真实样例锁定模板版本。</li>
+</ul>
+<h2 id="_13">验证</h2>
+<ul>
+<li>全后端：<code>3052 passed, 59 skipped, 11 warnings</code>（共收集 3111 项）；</li>
+<li>087、088、089 迁移在 <code>sentry_test</code> 连续执行两次成功；</li>
+<li>全新空库执行 <code>db/schema.sql</code> 后，正式出库、任务、核销和装车 4 类核心表均存在；</li>
+<li>管理端：干净 Node 20 依赖树中 33 个测试文件、201 项测试通过，生产构建通过；</li>
+<li>微信小程序：34 项 Node 测试通过；</li>
+<li>触及 Python 文件 Ruff、格式检查、Bandit 和 <code>git diff --check</code> 通过；</li>
+<li><code>pip-audit</code> 无已知漏洞，<code>npm audit</code> 为 0 个漏洞；</li>
+<li>gitleaks 8.21.2 扫描 767 个提交，无泄漏；MkDocs 严格构建通过。</li>
+</ul>
+<p>权限矩阵动态枚举当前全部船厂路由：无页面权限全部返回 <code>403</code>；全部非 GET 路由
+在拥有页面的只读账号下返回业务角色 <code>403</code>。区域船号映射更新按映射实际所属仓库
+校验，仓库 2 主管不能使用仓库 1 的映射 ID 修改配置。</p>
+<p>本切片使用独立测试库完成了一次服务级完整闭环：创建船号绑定和区域 → 导入并确认
+到货清单 → 两次吊牌 OCR 收货 → 导入并确认正式出库清单 → 两次吊牌 OCR
+核验物料编码/品名/规格 → 扣减库存 → 整单装车。最终库存余额为 <code>0.000</code>、出库单为
+<code>LOADED</code>，每托照片和 OCR 记录一一绑定。OCR 调用使用固定结果，不等同于真实云
+OCR、小程序真机和现场吊牌 UAT。</p>
+<p>可重复的真实 HTTP E2E 由 <code>api/tests/e2e_shipyard_http.py</code> 执行。该脚本会启动
+本机回环 Flask 服务，完整走登录、配置、清单确认、两托 OCR 收货、缺后缀补选、
+整票扣库、装车、后台重新查询和原图字节校验；同时覆盖缺托、重复照片、错误物料
+编码/品名/规格、OCR provider 失败、角色和页面权限、跨仓库隔离、同幂等键并发、新幂等键
+重复操作 <code>409</code>，以及并发装车只写一次。收货、核销、装车分别提交 50 个请求，
+最多 10 路并发；结束后检查票货余额、库存流水、收货累计、照片/OCR 归属、托盘
+状态和装车确认唯一性。额外使用 250 请求、50 并发连续执行两轮并通过；E2E 启动
+时重置进程内限流计数，避免重复运行继承上一轮的 <code>300/min</code> 配额。脚本最后恢复
+测试库种子数据。</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  </body>
+</html>
