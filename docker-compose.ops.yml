@@ -1,0 +1,117 @@
+# Production operations overlay. Apply it on top of either the development
+# or production Compose file:
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.ops.yml up -d
+#
+# It adds active health probing, external webhook alerts, and scheduled
+# PostgreSQL custom-format backups. Monitor probes reuse the API image;
+# backups use a dedicated PostgreSQL 16 client image so archives stay
+# restorable by the PostgreSQL 16 server.
+
+services:
+  ops-init:
+    image: busybox:1.36
+    container_name: sentry-ops-init
+    user: "0:0"
+    command:
+      - sh
+      - -c
+      - mkdir -p /state /backups && chown -R 1000:1000 /state /backups && chmod 700 /state /backups
+    volumes:
+      - opsstate:/state
+      - backupdata:/backups
+    restart: "no"
+
+  ops-monitor:
+    build:
+      context: .
+      dockerfile: ./api/Dockerfile
+    container_name: sentry-ops-monitor
+    command: ["python", "-m", "ops.monitor"]
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+    depends_on:
+      ops-init:
+        condition: service_completed_successfully
+    environment:
+      PYTHONPATH: /app
+      SENTRY_OPS_API_HEALTH_URL: http://api:5000/api/health
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sentry}:${POSTGRES_PASSWORD:-sentry}@db:5432/${POSTGRES_DB:-sentry}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379/0
+      SENTRY_OPS_ENVIRONMENT: ${SENTRY_OPS_ENVIRONMENT:-production}
+      SENTRY_OPS_STATE_DIR: /state
+      SENTRY_OPS_INTERVAL_S: ${SENTRY_OPS_INTERVAL_S:-60}
+      SENTRY_OPS_TIMEOUT_S: ${SENTRY_OPS_TIMEOUT_S:-5}
+      SENTRY_OPS_FAILURE_THRESHOLD: ${SENTRY_OPS_FAILURE_THRESHOLD:-2}
+      SENTRY_OPS_REPEAT_S: ${SENTRY_OPS_REPEAT_S:-3600}
+      SENTRY_OPS_BACKUP_MAX_AGE_HOURS: ${SENTRY_OPS_BACKUP_MAX_AGE_HOURS:-30}
+      SENTRY_OPS_ALERT_WEBHOOK_URL: ${SENTRY_OPS_ALERT_WEBHOOK_URL:?Set SENTRY_OPS_ALERT_WEBHOOK_URL in .env}
+      SENTRY_OPS_ALERT_BEARER_TOKEN: ${SENTRY_OPS_ALERT_BEARER_TOKEN:-}
+      SENTRY_OPS_ALLOW_HTTP_ALERTS: ${SENTRY_OPS_ALLOW_HTTP_ALERTS:-false}
+    volumes:
+      - opsstate:/state
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -m
+        - ops.healthcheck
+        - /state/monitor-heartbeat
+        - --max-age-seconds
+        - "180"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  ops-backup:
+    build:
+      context: .
+      dockerfile: ./ops/backup.Dockerfile
+    container_name: sentry-ops-backup
+    command: ["python3", "-m", "ops.backup"]
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+    stop_grace_period: 30s
+    depends_on:
+      ops-init:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    environment:
+      PYTHONPATH: /app
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sentry}:${POSTGRES_PASSWORD:-sentry}@db:5432/${POSTGRES_DB:-sentry}
+      SENTRY_OPS_STATE_DIR: /state
+      SENTRY_BACKUP_DIR: /backups
+      SENTRY_BACKUP_SCHEDULE_UTC: ${SENTRY_BACKUP_SCHEDULE_UTC:-02:30}
+      SENTRY_BACKUP_RETENTION_COUNT: ${SENTRY_BACKUP_RETENTION_COUNT:-14}
+      SENTRY_BACKUP_TIMEOUT_S: ${SENTRY_BACKUP_TIMEOUT_S:-1800}
+      SENTRY_BACKUP_RETRY_S: ${SENTRY_BACKUP_RETRY_S:-900}
+      SENTRY_BACKUP_RUN_ON_START: ${SENTRY_BACKUP_RUN_ON_START:-true}
+    volumes:
+      - backupdata:/backups
+      - opsstate:/state
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -m
+        - ops.healthcheck
+        - /state/backup-heartbeat
+        - --max-age-seconds
+        - "120"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  opsstate:
+  backupdata:

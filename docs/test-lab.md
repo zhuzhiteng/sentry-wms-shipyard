@@ -56,6 +56,10 @@ docker exec sentry-api sh -c 'export FLASK_ENV=test SENTRY_ALLOW_HTTP_WEBHOOKS=f
   样本测公网 OCR 的字段准确率、耗时和失败恢复，并保留仓库外报告；
 - 在微信真机测拍照、失败重试、弱网和原图上传；
 - 断开网络提交后重连，确认复用原幂等键；关闭页面再进入，确认已拍托盘草稿可恢复；
+- 运行 `ops-monitor` 和 `ops-backup` 单元测试，解析 ops Compose overlay，并执行一次
+  `ops.monitor --once`、`ops.backup --once`；
+- 在预发布环境配置告警 webhook，制造可控 API/Redis 故障并确认故障与恢复通知；
+- 完成一份计划备份的哈希校验、隔离恢复、行数比较和保留策略验证；
 - 验证小程序合法域名、HTTPS、AppID 和隐私声明；
 - 连续提交同一幂等键，确认不重复收货、扣库或装车；
 - 验证角色收回、跨仓库访问和只读账号均被拒绝；
