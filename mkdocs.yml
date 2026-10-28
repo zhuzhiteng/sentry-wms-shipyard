@@ -45,6 +45,7 @@ nav:
       - 拍照识别收货: shipyard/receipt-api.md
       - 正式出库与装车: shipyard/formal-outbound-api.md
       - 真实吊牌 OCR 验收: shipyard/ocr-acceptance.md
+      - 备份恢复演练: shipyard/recovery-drill.md
       - 风险闭环台账: shipyard/risk-register.md
   - 测试手册: test-lab.md
   - 贡献指南: contributing.md
