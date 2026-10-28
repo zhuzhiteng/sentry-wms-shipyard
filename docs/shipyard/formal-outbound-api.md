@@ -261,7 +261,7 @@ HTTPS API 域名、微信 request/uploadFile 合法域名和真实 AppID。
 
 ## 验证
 
-- 全后端：`3111 passed, 11 warnings`；
+- 全后端：`3052 passed, 59 skipped, 11 warnings`（共收集 3111 项）；
 - 087、088、089 迁移在 `sentry_test` 连续执行两次成功；
 - 全新空库执行 `db/schema.sql` 后，正式出库、任务、核销和装车 4 类核心表均存在；
 - 管理端：干净 Node 20 依赖树中 33 个测试文件、201 项测试通过，生产构建通过；

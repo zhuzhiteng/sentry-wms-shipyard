@@ -67,7 +67,7 @@
 - 清理代码提交：`1a149b7865811874847e707650ff92c880a8623e`；
 - CI 配置测试修复提交：`df859d3d3b75f7f79cda9d2c16c67f99435bf98f`；
 - 交付 PR：`https://github.com/zhuzhiteng/sentry-wms-shipyard/pull/1`；
-- 后端全量：`3111 passed, 11 warnings`；
+- 后端全量：`3052 passed, 59 skipped, 11 warnings`（共收集 3111 项）；
 - 管理端：33 个测试文件、201 项通过，生产构建通过；
 - 微信小程序：34 项通过；
 - PR required checks：Tests `40706673891`、Dependency Audit `40706673580`、
