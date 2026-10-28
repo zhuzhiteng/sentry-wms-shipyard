@@ -84,6 +84,11 @@ Page({
   },
 
   onPullDownRefresh() {
+    if (this.data.busy || this.submissionPending) {
+      wx.stopPullDownRefresh();
+      wx.showToast({ title: '正在提交，请等待结果', icon: 'none' });
+      return;
+    }
     this.loadManifests().finally(() => wx.stopPullDownRefresh());
   },
 
@@ -212,6 +217,10 @@ Page({
   },
 
   onManifestTap(event) {
+    if (this.data.busy || this.submissionPending) {
+      wx.showToast({ title: '正在提交，请等待结果', icon: 'none' });
+      return;
+    }
     this.openManifest(event.currentTarget.dataset.id);
   },
 

@@ -502,6 +502,42 @@ test('receiving cannot switch tickets while a submission is in flight', () => {
   );
 });
 
+test('receiving blocks refresh and manifest switching while submitting', () => {
+  const session = {
+    user: { username: 'receiver' },
+    warehouseId: 1,
+  };
+  installMock('utils/session.js', {
+    requireSession: () => session,
+  });
+  installMock('utils/request.js', {
+    request: async () => ({}),
+    upload: async () => ({}),
+  });
+  let stoppedRefreshes = 0;
+  const toasts = [];
+  global.wx = {
+    stopPullDownRefresh: () => { stoppedRefreshes += 1; },
+    showToast: (options) => toasts.push(options.title),
+  };
+  installMemoryStorage(global.wx);
+
+  const page = instantiate(loadPage('pages/receive/index.js'));
+  page.data.busy = true;
+  let loads = 0;
+  let opens = 0;
+  page.loadManifests = async () => { loads += 1; };
+  page.openManifest = async () => { opens += 1; };
+
+  page.onPullDownRefresh();
+  page.onManifestTap({ currentTarget: { dataset: { id: 'manifest-2' } } });
+
+  assert.equal(stoppedRefreshes, 1);
+  assert.equal(loads, 0);
+  assert.equal(opens, 0);
+  assert.equal(toasts.length, 2);
+});
+
 test('outbound restores photographed pallets before confirmation', async () => {
   const session = {
     user: { username: 'outbound' },
