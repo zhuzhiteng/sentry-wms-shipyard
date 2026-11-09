@@ -113,9 +113,12 @@ class TestV042_DependencyAuditInCI:
         """
         workflow = _read(".github/workflows/audit.yml")
         assert "npm_audit_gate.py" in workflow
-        assert workflow.count(
-            'run: python3 "${{ github.workspace }}/.github/scripts/npm_audit_gate.py"'
-        ) == 1
+        assert (
+            workflow.count(
+                'run: python3 "${{ github.workspace }}/.github/scripts/npm_audit_gate.py"'
+            )
+            == 1
+        )
         # The bare npm command must not be the gate any more -- a plain
         # `npm audit` without the wrapper would ignore the allowlist rules.
         assert "run: npm audit" not in workflow
@@ -161,12 +164,14 @@ class TestNpmAuditGate:
         """Synthesise an `npm audit --json` body from (pkg, severity, ghsa)."""
         vulns: dict = {}
         for pkg, severity, ghsa in advisories:
-            vulns.setdefault(pkg, {"via": []})["via"].append({
-                "severity": severity,
-                "title": f"{pkg} advisory",
-                "url": f"https://github.com/advisories/{ghsa}",
-                "range": "*",
-            })
+            vulns.setdefault(pkg, {"via": []})["via"].append(
+                {
+                    "severity": severity,
+                    "title": f"{pkg} advisory",
+                    "url": f"https://github.com/advisories/{ghsa}",
+                    "range": "*",
+                }
+            )
         return {"vulnerabilities": vulns}
 
     def test_blocks_unaccepted_high_and_critical(self):
@@ -212,14 +217,20 @@ class TestNpmAuditGate:
         """An id that stops being reported must surface, so a dead exception
         cannot sit there masking whatever is disclosed under it next."""
         gate = self._gate()
-        blocking, accepted, stale = gate.evaluate(self._audit(), {"GHSA-eeee-eeee-eeee"})
+        blocking, accepted, stale = gate.evaluate(
+            self._audit(), {"GHSA-eeee-eeee-eeee"}
+        )
         assert blocking == {}
         assert accepted == {}
         assert stale == {"GHSA-eeee-eeee-eeee"}
 
     def test_allowlist_parsing_accepts_commas_and_whitespace(self):
         gate = self._gate()
-        assert gate.parse_allow("GHSA-a, GHSA-b\nGHSA-c") == {"GHSA-a", "GHSA-b", "GHSA-c"}
+        assert gate.parse_allow("GHSA-a, GHSA-b\nGHSA-c") == {
+            "GHSA-a",
+            "GHSA-b",
+            "GHSA-c",
+        }
         assert gate.parse_allow("") == set()
 
     def test_workflow_allowlist_entries_are_documented(self):
@@ -309,16 +320,16 @@ class TestV003_AdminDockerfileProduction:
         # still be 127.0.0.1 so a production deploy that does not set
         # the variable stays V-040-safe.
         compose = _read("docker-compose.yml")
-        assert re.search(
-            r'"\$\{ADMIN_BIND_HOST:-127\.0\.0\.1\}:8080:8080"', compose
-        ), "admin port binding must default to 127.0.0.1"
+        assert re.search(r'"\$\{ADMIN_BIND_HOST:-127\.0\.0\.1\}:8080:8080"', compose), (
+            "admin port binding must default to 127.0.0.1"
+        )
 
     def test_compose_api_bind_host_defaults_to_loopback(self):
         # #64: same invariant for the api service.
         compose = _read("docker-compose.yml")
-        assert re.search(
-            r'"\$\{API_BIND_HOST:-127\.0\.0\.1\}:5000:5000"', compose
-        ), "api port binding must default to 127.0.0.1"
+        assert re.search(r'"\$\{API_BIND_HOST:-127\.0\.0\.1\}:5000:5000"', compose), (
+            "api port binding must default to 127.0.0.1"
+        )
 
     def test_compose_admin_no_bind_mount(self):
         # The prod compose must not bind-mount ./admin into the container;
@@ -327,7 +338,9 @@ class TestV003_AdminDockerfileProduction:
         # The admin service block starts at "admin:" and continues until
         # the next top-level service or end of file. We just assert the
         # source mount pattern does not appear alongside admin anywhere.
-        assert "./admin:/app" not in compose, "source bind-mount belongs in docker-compose.dev.yml only"
+        assert "./admin:/app" not in compose, (
+            "source bind-mount belongs in docker-compose.dev.yml only"
+        )
 
     def test_dockerignore_excludes_noise(self):
         ignored = _read("admin/.dockerignore")
@@ -358,9 +371,9 @@ class TestV111_AdminNginxHsts:
         # the add_header uses a variable whose value comes from a map keyed
         # on $scheme / $http_x_forwarded_proto.
         nginx_conf = _read("admin/nginx.conf.template")
-        assert re.search(
-            r"add_header\s+Strict-Transport-Security\s+\$", nginx_conf
-        ), "HSTS must be driven by a variable, not an unconditional literal"
+        assert re.search(r"add_header\s+Strict-Transport-Security\s+\$", nginx_conf), (
+            "HSTS must be driven by a variable, not an unconditional literal"
+        )
 
     def test_nginx_hsts_gated_on_https(self):
         nginx_conf = _read("admin/nginx.conf.template")
@@ -379,7 +392,9 @@ class TestV111_AdminNginxHsts:
             r"map\s+\$http_x_forwarded_proto\s+\$\w+\s*\{[^}]*\"https\"\s*\"max-age=",
             nginx_conf,
             re.DOTALL,
-        ), "nginx.conf must map X-Forwarded-Proto=https to HSTS so proxied TLS terminations still trigger the header"
+        ), (
+            "nginx.conf must map X-Forwarded-Proto=https to HSTS so proxied TLS terminations still trigger the header"
+        )
 
     def test_nginx_hsts_uses_one_year_includesubdomains(self):
         nginx_conf = _read("admin/nginx.conf.template")
@@ -427,7 +442,9 @@ class TestV004_RedisRequirePass:
         # reachable from the host network.
         compose = _read("docker-compose.yml")
         # There should be no "6379:" line under the redis service block.
-        redis_block = compose[compose.find("  redis:"):compose.find("  celery-worker:")]
+        redis_block = compose[
+            compose.find("  redis:") : compose.find("  celery-worker:")
+        ]
         assert "6379:" not in redis_block
 
 
@@ -441,9 +458,10 @@ class TestV069_NoSeedAdminHash:
         # The specific published hash must be gone from every SQL file.
         for sql_path in (REPO_ROOT / "db").glob("*.sql"):
             body = sql_path.read_text()
-            assert "$2b$12$zDGRKFLmc6v/A4mVhxOzb.7uoW1ulnXn0AisK5uJ5iWk33vC2EpSK" not in body, (
-                f"{sql_path.name} still contains the known bcrypt hash of 'admin'"
-            )
+            assert (
+                "$2b$12$zDGRKFLmc6v/A4mVhxOzb.7uoW1ulnXn0AisK5uJ5iWk33vC2EpSK"
+                not in body
+            ), f"{sql_path.name} still contains the known bcrypt hash of 'admin'"
             # No generic bcrypt hash literal (prefix $2a$/$2b$/$2y$) should
             # appear in the public SQL. Hashes belong to runtime scripts only.
             for prefix in ("$2a$", "$2b$", "$2y$"):
@@ -463,6 +481,8 @@ class TestV069_NoSeedAdminHash:
         script = _read("db/seed.sh")
         assert "UPDATE users SET password_hash" in script
         assert "crypt(" in script
+        assert 'echo "  Admin password: $ADMIN_PW"' not in script
+        assert "Admin password: supplied through ADMIN_PASSWORD" in script
 
 
 class TestV005_NoKeyMaterialInLogs:
@@ -471,5 +491,5 @@ class TestV005_NoKeyMaterialInLogs:
         # The auto-generate + log path is gone; no logger.* call should
         # reference the key variable.
         assert "auto-generated" not in vault
-        assert "os.environ[\"SENTRY_ENCRYPTION_KEY\"] =" not in vault
+        assert 'os.environ["SENTRY_ENCRYPTION_KEY"] =' not in vault
         assert "SENTRY_ENCRYPTION_KEY=%s" not in vault

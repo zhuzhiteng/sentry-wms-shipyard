@@ -6,7 +6,8 @@
 - 现场端：微信开发者工具和至少一台真机；
 - 服务端：Docker Compose；
 - 测试库：独立 `sentry_test`，禁止指向生产库；
-- OCR：测试默认使用固定识别结果，现场 UAT 使用已获授权的公网 OCR。
+- OCR：自动测试使用固定结果；现场 UAT 默认使用 API 主机内的 RapidOCR，
+  只有获准配置百度兜底时才会向百度发送图片。
 
 现场不测试二维码、条码或扫码枪。每个托盘拍一张吊牌原图，系统用同一张图完成
 OCR 识别和留证。
@@ -53,7 +54,8 @@ docker exec sentry-api sh -c 'export FLASK_ENV=test SENTRY_ALLOW_HTTP_WEBHOOKS=f
 ## 上线前专项
 
 - 按 [`shipyard/ocr-acceptance.md`](shipyard/ocr-acceptance.md) 用真实脱敏吊牌
-  样本测公网 OCR 的字段准确率、耗时和失败恢复，并保留仓库外报告；
+  样本分别测 RapidOCR 和已启用的云兜底的字段准确率、耗时和失败恢复，并保留
+  仓库外报告；
 - 在微信真机测拍照、失败重试、弱网和原图上传；
 - 断开网络提交后重连，确认复用原幂等键；关闭页面再进入，确认已拍托盘草稿可恢复；
 - 运行 `ops-monitor` 和 `ops-backup` 单元测试，解析 ops Compose overlay，并执行一次

@@ -188,6 +188,24 @@ Use `docker-compose.prod.yml` which has no source volume mounts:
 docker compose -f docker-compose.prod.yml up -d
 ```
 
+For a fresh production volume, the production Compose file also mounts the current
+schema and minimal seed, requires `ADMIN_PASSWORD`, and enables PostgreSQL data
+checksums. Do not use the development seed defaults.
+
+Before building or deploying, run the consolidated release gate:
+
+```powershell
+node tools/shipyard/release-preflight.mjs `
+  --env-file D:\secure\shipyard-production.env `
+  --app-id wx_REPLACE_WITH_REAL_APP_ID `
+  --api-base https://wms-api.example.com/api `
+  --output-dir D:\release\shipyard-miniprogram `
+  --report-dir D:\release\preflight
+```
+
+See [`shipyard/go-live-checklist.md`](shipyard/go-live-checklist.md) and
+[`shipyard/cutover-runbook.md`](shipyard/cutover-runbook.md) before approval.
+
 生产还需要叠加监控告警和定时备份 sidecar：
 
 ```bash
