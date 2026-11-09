@@ -1,8 +1,8 @@
 <view class="page">
   <view class="hero">
-    <view class="chip">INBOUND</view>
+    <view class="chip">到货</view>
     <view class="hero-title">到货验收</view>
-    <view class="hero-meta">选择待收货票货，逐托拍吊牌并自动识别打印字段。</view>
+    <view class="hero-meta">选择到货清单和货物，拍完后信息会自动读出来。</view>
   </view>
 
   <view class="section-title">待收货清单</view>
@@ -23,40 +23,125 @@
       <view class="chip {{item.status_class}}">{{item.status_label}}</view>
     </view>
     <view class="grid-2 manifest-metrics">
-      <view><view class="label">票数</view><view class="value">{{item.line_count}}</view></view>
+      <view><view class="label">货物行数</view><view class="value">{{item.line_count}}</view></view>
       <view><view class="label">创建时间</view><view class="value time">{{item.created_at}}</view></view>
     </view>
   </view>
 
   <block wx:if="{{selectedManifest}}">
-    <view class="section-title">票货任务 · {{selectedManifest.manifest.manifest_no}}</view>
-    <view wx:if="{{!selectedManifest.tickets.length}}" class="empty">该清单尚未生成票货任务</view>
+    <view class="section-title">到货货物 · {{selectedManifest.manifest.manifest_no}}</view>
+    <view wx:if="{{!selectedTicket}}" class="card arrival-slip-card">
+      <view class="row-start">
+        <view class="grow">
+          <view class="title">四联到货验收单</view>
+          <view class="subtitle">先拍整张验收单，单号、供应商和工程号会自动读出来。</view>
+        </view>
+        <view wx:if="{{arrivalSlipPhotoPath}}" class="chip chip-success">已拍照</view>
+        <view wx:elif="{{editingArrivalSlipId}}" class="chip chip-warning">修改中</view>
+        <view wx:elif="{{arrivalSlipSavedCount > 0}}" class="chip chip-success">
+          已保存 {{arrivalSlipSavedCount}} 张
+        </view>
+      </view>
+      <button class="button-secondary" loading="{{busy}}" disabled="{{busy}}" bindtap="captureArrivalSlip">
+        {{arrivalSlipPhotoPath ? '重新拍摄当前验收单' : (arrivalSlipSavedCount > 0 ? '继续拍下一张验收单' : '拍摄四联验收单')}}
+      </button>
+      <view wx:if="{{arrivalSlipMessage}}" class="notice">
+        {{arrivalSlipMessage}}
+      </view>
+      <view wx:if="{{arrivalSlipPhotoPath && !arrivalSlipExpanded}}" class="arrival-slip-summary">
+        <view><text class="muted">验收单号</text>{{arrivalSlipForm.slip_no || '待补充'}}</view>
+        <view><text class="muted">送货单号</text>{{arrivalSlipForm.delivery_note_no || '待补充'}}</view>
+        <view><text class="muted">供应商</text>{{arrivalSlipForm.supplier_name || '待补充'}}</view>
+        <view><text class="muted">工程号</text>{{arrivalSlipForm.engineering_no || '待补充'}}</view>
+      </view>
+      <view wx:if="{{arrivalSlipPhotoPath}}" class="arrival-slip-toggle" bindtap="toggleArrivalSlipDetails">
+        {{arrivalSlipExpanded ? '收起验收单信息' : '信息不对？点此修改'}}
+      </view>
+      <block wx:if="{{arrivalSlipExpanded}}">
+        <view class="field">
+          <view class="label">验收单号</view>
+          <input class="input" value="{{arrivalSlipForm.slip_no}}" data-field="slip_no" bindinput="onArrivalSlipInput" />
+        </view>
+        <view class="field">
+          <view class="label">送货单号</view>
+          <input class="input" value="{{arrivalSlipForm.delivery_note_no}}" data-field="delivery_note_no" bindinput="onArrivalSlipInput" />
+        </view>
+        <view class="field">
+          <view class="label">供应商</view>
+          <input class="input" value="{{arrivalSlipForm.supplier_name}}" data-field="supplier_name" bindinput="onArrivalSlipInput" />
+        </view>
+        <view class="grid-2">
+          <view class="field">
+            <view class="label">工程号</view>
+            <input class="input" value="{{arrivalSlipForm.engineering_no}}" data-field="engineering_no" bindinput="onArrivalSlipInput" />
+          </view>
+          <view class="field">
+            <view class="label">采购单号（PO NO）</view>
+            <input class="input" value="{{arrivalSlipForm.purchase_order_no}}" data-field="purchase_order_no" bindinput="onArrivalSlipInput" />
+          </view>
+        </view>
+      </block>
+      <button
+        wx:if="{{arrivalSlipPhotoPath || editingArrivalSlipId}}"
+        class="button-primary"
+        loading="{{busy}}"
+        disabled="{{busy}}"
+        bindtap="saveArrivalSlip"
+      >
+        {{editingArrivalSlipId ? '保存修改' : '确认留存四联验收单'}}
+      </button>
+      <view wx:if="{{arrivalSlipSavedCount > 0 && !arrivalSlipPhotoPath}}" class="notice">
+        <view class="row">
+          <view class="grow">最近保存：{{selectedManifest.arrival_slips[0].slip_no}}</view>
+          <button
+            class="mini-action"
+            data-id="{{selectedManifest.arrival_slips[0].arrival_slip_id}}"
+            bindtap="editSavedArrivalSlip"
+            disabled="{{busy || submitUncertain}}"
+          >修改</button>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{!selectedManifest.tickets.length}}" class="empty">这张清单还没有可收货的货物</view>
     <view wx:for="{{selectedManifest.tickets}}" wx:key="ticket_id" class="card">
       <view class="row-start">
         <view class="grow">
           <view class="title">{{item.ticket_no}}</view>
           <view class="subtitle">{{item.item_name}} · {{item.item_spec || '无规格'}}</view>
         </view>
-        <view class="chip {{item.status_class}}">{{item.status_label}}</view>
+        <view>
+          <view class="chip {{item.delivery_class}}">{{item.delivery_label}}</view>
+          <view class="chip {{item.status_class}}">{{item.status_label}}</view>
+        </view>
       </view>
       <view class="divider"></view>
       <view class="grid-3">
-        <view><view class="label">整票计划</view><view class="value">{{item.declared_quantity}}</view></view>
-        <view><view class="label">已收</view><view class="value">{{item.received_quantity}}</view></view>
-        <view><view class="label">剩余应收</view><view class="value">{{item.remaining_quantity_text}}</view></view>
+        <view><view class="label">本批应到</view><view class="value">{{item.declared_quantity}}</view></view>
+        <view><view class="label">已到</view><view class="value">{{item.received_quantity}}</view></view>
+        <view><view class="label">还应到</view><view class="value">{{item.remaining_quantity_text}}</view></view>
       </view>
       <view class="pallet-progress">{{item.pallet_progress_text}}</view>
       <view class="area">
-        <view class="label">指定区域</view>
+        <view class="label">存放区域</view>
         <view class="area-value">{{item.location_path_snapshot}}</view>
       </view>
+      <view wx:if="{{item.deferred_text}}" class="notice">{{item.deferred_text}}</view>
       <button
         class="button-primary"
         data-id="{{item.ticket_id}}"
         bindtap="startTicket"
         disabled="{{!item.can_receive || submitUncertain || busy}}"
       >
-        {{item.status === 'PARTIAL' ? '继续补收货' : '开始收货'}}
+        {{item.status === 'PARTIAL' ? '继续收货' : '开始收货'}}
+      </button>
+      <button
+        wx:if="{{item.can_defer}}"
+        class="button-secondary"
+        data-id="{{item.ticket_id}}"
+        bindtap="deferTicket"
+        disabled="{{busy || submitUncertain}}"
+      >
+        本批未装，顺延下批
       </button>
     </view>
   </block>
@@ -67,25 +152,24 @@
       <view class="title">{{selectedTicket.item_name}}</view>
       <view class="subtitle">{{selectedTicket.item_spec || '无规格'}}</view>
       <view class="area">
-        <view class="label">指定区域（只读）</view>
+        <view class="label">存放区域</view>
         <view class="area-value">{{selectedTicket.location_path_snapshot}}</view>
       </view>
       <view class="grid-2">
-        <view><view class="label">整票计划</view><view class="value">{{selectedTicket.declared_quantity}} 件</view></view>
-        <view><view class="label">预计托盘</view><view class="value">{{selectedTicket.expected_pallet_count || '未配置'}}</view></view>
+        <view><view class="label">本批应到</view><view class="value">{{selectedTicket.declared_quantity}} 件</view></view>
+        <view><view class="label">预计托盘数</view><view class="value">{{selectedTicket.expected_pallet_count || '未填写'}}</view></view>
       </view>
       <view class="grid-2 workbench-metrics">
-        <view><view class="label">已收 / 剩余</view><view class="value">{{selectedTicket.received_quantity}} / {{remainingQuantityText}}</view></view>
-        <view><view class="label">本次已识别托盘</view><view class="value">{{palletProgressText}}</view></view>
+        <view><view class="label">已到 / 还应到</view><view class="value">{{selectedTicket.received_quantity}} / {{remainingQuantityText}}</view></view>
+        <view><view class="label">本次已拍托盘</view><view class="value">{{palletProgressText}}</view></view>
       </view>
 
       <view class="notice">
-        每托只拍一张吊牌。系统识别船号、图号、物料和托盘后缀；少于剩余应收时必须填写差异原因，
-        整票数量收满时，全部托盘必须齐套。
+        每托拍一张吊牌，系统会自动核对。全部到齐时托盘必须拍齐；少货时请填写原因。
       </view>
-      <view class="ocr-note">原图用于留证，并上传云端识别吊牌打印字段。</view>
+      <view class="ocr-note">吊牌照片会保存，并自动读出来。</view>
       <view wx:if="{{submitUncertain}}" class="uncertain-banner">
-        上次提交结果未确认。请重试上次收货，系统会复用同一提交编号，不会重复入库。
+        上次操作结果未确认。请再次确认收货，系统不会重复入账。
       </view>
       <view wx:if="{{nextSuffix}}" class="next-suffix">{{nextSuffix}}</view>
       <button
@@ -94,7 +178,7 @@
         disabled="{{busy || submitUncertain}}"
         bindtap="captureLabel"
       >
-        拍摄识别吊牌
+        拍摄托盘吊牌
       </button>
 
       <view wx:if="{{scans.length}}" class="scans">
@@ -110,7 +194,7 @@
             />
             <view class="scan-info">
               <view class="value">托盘 {{item.suffix}}</view>
-              <view class="muted">{{item.recognized.item_name || '已识别吊牌'}} · {{item.recognized.item_spec || '无规格'}}</view>
+              <view class="muted">{{item.recognized.item_name || '吊牌信息'}} · {{item.recognized.item_spec || '无规格'}}</view>
               <view class="scan-hint">点照片可核对原图</view>
             </view>
           </view>
@@ -119,12 +203,22 @@
             data-suffix="{{item.suffix}}"
             bindtap="removeScan"
             disabled="{{submitUncertain}}"
-          >移除</button>
+          >删掉重拍</button>
         </view>
       </view>
 
-      <view class="field">
-        <view class="label">本次实收数量（剩余应收 {{remainingQuantityText}}）</view>
+      <view wx:if="{{!editQuantity}}" class="quantity-summary">
+        <view>
+          <view class="label">本次实收</view>
+          <view class="quantity-value">{{quantity}} 件</view>
+          <view class="muted">本批还应到 {{remainingQuantityText}} 件，按足额收货</view>
+        </view>
+        <button class="quantity-edit" bindtap="toggleQuantityEdit" disabled="{{submitUncertain}}">
+          有少货
+        </button>
+      </view>
+      <view wx:else class="field">
+        <view class="label">本次实收数量（还应到 {{remainingQuantityText}} 件）</view>
         <input
           class="input"
           type="digit"
@@ -132,9 +226,13 @@
           bindinput="onQuantityInput"
           disabled="{{submitUncertain}}"
         />
+        <view class="quantity-edit-actions">
+          <text class="quantity-hint">少货时填写实际数量</text>
+          <button class="quantity-reset" bindtap="restoreFullQuantity">按足额收货</button>
+        </view>
       </view>
-      <view class="field">
-        <view class="label">差异原因（本次少于剩余应收时必填）</view>
+      <view wx:if="{{showDifferenceReason}}" class="field">
+        <view class="label">少货原因</view>
         <textarea
           class="textarea"
           maxlength="500"
@@ -152,7 +250,7 @@
         disabled="{{busy}}"
         bindtap="confirmReceipt"
       >
-        {{submitUncertain ? '重试上次收货' : '确认整票收货'}}
+        {{submitUncertain ? '再次确认收货' : '确认本次收货'}}
       </button>
     </view>
   </view>

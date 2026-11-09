@@ -13,15 +13,18 @@ from middleware.auth_middleware import (
 )
 from middleware.db import with_db
 from schemas.shipyard import (
+    DeferInboundBatchRequest,
     ReceiveTicketRequest,
     ShortageReportRequest,
 )
 from services.shipyard.receipt_service import (
     confirm_ticket_receipt,
+    defer_ticket_batch,
     get_photo,
     get_ticket_context,
     recognize_ticket_label_photo,
     report_ticket_shortage,
+    restore_ticket_delivery,
 )
 from utils.uploads import (
     UnsupportedImageError,
@@ -117,6 +120,45 @@ def update_ticket_shortage(ticket_id, validated):
         reported_by=g.current_user["username"],
     )
     return jsonify(payload)
+
+
+@shipyard_bp.post("/inbound/tickets/<uuid:ticket_id>/deferral")
+@require_auth
+@require_shipyard_roles(*RECEIPT_WRITE_ROLES)
+@require_admin_or_page_permission("inbound")
+@validate_body(DeferInboundBatchRequest)
+@with_db
+def defer_inbound_ticket(ticket_id, validated):
+    _context, ok, denied = _check_ticket_access(ticket_id)
+    if not ok:
+        return denied
+    return jsonify(
+        defer_ticket_batch(
+            g.db,
+            ticket_id=str(ticket_id),
+            next_batch_date=validated.next_batch_date,
+            reason=validated.reason,
+            deferred_by=g.current_user["username"],
+        )
+    )
+
+
+@shipyard_bp.delete("/inbound/tickets/<uuid:ticket_id>/deferral")
+@require_auth
+@require_shipyard_roles(*RECEIPT_WRITE_ROLES)
+@require_admin_or_page_permission("inbound")
+@with_db
+def restore_inbound_ticket_delivery(ticket_id):
+    _context, ok, denied = _check_ticket_access(ticket_id)
+    if not ok:
+        return denied
+    return jsonify(
+        restore_ticket_delivery(
+            g.db,
+            ticket_id=str(ticket_id),
+            restored_by=g.current_user["username"],
+        )
+    )
 
 
 @shipyard_bp.get("/photos/<uuid:photo_id>")

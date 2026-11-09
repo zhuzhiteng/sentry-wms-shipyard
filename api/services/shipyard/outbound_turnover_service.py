@@ -238,6 +238,14 @@ def _field_mismatches(context, scan) -> list[dict[str, Any]]:
     return mismatches
 
 
+def _required_ocr_expectation(context) -> dict[str, Any]:
+    snapshot = dict(context.material_snapshot or {})
+    return {
+        "item_spec": context.item_spec,
+        "required_fields": snapshot.get("required_ocr_fields"),
+    }
+
+
 def _photo_payload(row) -> dict[str, Any]:
     return {
         "photo_id": str(row.photo_id),
@@ -449,7 +457,7 @@ def recognize_outbound_label_photo(
     append_required_field_mismatches(
         mismatches,
         scan,
-        expected={"item_spec": context.item_spec},
+        expected=_required_ocr_expectation(context),
     )
     if suffix and suffix not in set(context.expected_tag_suffixes):
         mismatches.append(
@@ -896,7 +904,7 @@ def confirm_outbound_task(
         append_required_field_mismatches(
             mismatches,
             effective_scan,
-            expected={"item_spec": context.item_spec},
+            expected=_required_ocr_expectation(context),
         )
         if mismatches:
             raise OutboundValidationError(

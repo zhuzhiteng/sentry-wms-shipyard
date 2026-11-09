@@ -42,6 +42,39 @@ function installMemoryStorage(wx) {
   return values;
 }
 
+test('receiving keeps the saved photo and asks again after an invalid pallet number', async () => {
+  const session = {
+    user: { username: 'receiver' },
+    warehouseId: 1,
+  };
+  installMock('utils/session.js', {
+    requireSession: () => session,
+  });
+  installMock('utils/request.js', {
+    request: async () => ({}),
+    upload: async () => ({}),
+  });
+  const answers = [
+    { confirm: true, content: '一号托' },
+    { confirm: true, content: '1-1' },
+  ];
+  const toasts = [];
+  let promptCount = 0;
+  global.wx = {
+    showModal: (options) => {
+      promptCount += 1;
+      options.success(answers.shift());
+    },
+    showToast: (options) => toasts.push(options.title),
+  };
+
+  const page = instantiate(loadPage('pages/receive/index.js'));
+
+  assert.equal(await page.askSuffix(), '1-1');
+  assert.equal(promptCount, 2);
+  assert.ok(toasts.includes('请按 1-1 的格式填写'));
+});
+
 test('receiving captures once and uses OCR without scanning a QR code', async () => {
   const uploads = [];
   const previews = [];
@@ -85,6 +118,7 @@ test('receiving captures once and uses OCR without scanning a QR code', async ()
 
   const page = instantiate(loadPage('pages/receive/index.js'));
   page.data.session = session;
+  page.data.selectedManifestId = 'manifest-1';
   page.data.selectedTicket = {
     ticket_id: 'ticket-1',
     declared_quantity: '4.000',
@@ -115,8 +149,58 @@ test('receiving captures once and uses OCR without scanning a QR code', async ()
   });
 });
 
+test('receiving defaults to the remaining quantity and only asks for a shortage reason when reduced', async () => {
+  const session = {
+    user: { username: 'receiver' },
+    warehouseId: 1,
+  };
+  installMock('utils/session.js', {
+    requireSession: () => session,
+  });
+  installMock('utils/request.js', {
+    request: async () => ({}),
+    upload: async () => ({}),
+  });
+  global.wx = {
+    showToast: () => {},
+    pageScrollTo: () => {},
+  };
+
+  const page = instantiate(loadPage('pages/receive/index.js'));
+  page.data.session = session;
+  page.data.selectedManifest = {
+    tickets: [{
+      ticket_id: 'ticket-1',
+      declared_quantity: '4.000',
+      received_quantity: '0.000',
+      expected_pallet_count: 2,
+      status: 'EXPECTED',
+    }],
+  };
+
+  page.startTicket({
+    currentTarget: { dataset: { id: 'ticket-1' } },
+  });
+  assert.equal(page.data.quantity, '4');
+  assert.equal(page.data.showDifferenceReason, false);
+  assert.equal(page.data.editQuantity, false);
+
+  page.toggleQuantityEdit();
+  assert.equal(page.data.editQuantity, true);
+  page.onQuantityInput({ detail: { value: '2' } });
+  assert.equal(page.data.showDifferenceReason, true);
+  page.data.differenceReason = '少 2 件，余货明天补到';
+
+  page.restoreFullQuantity();
+  assert.equal(page.data.editQuantity, false);
+  assert.equal(page.data.quantity, '4');
+  assert.equal(page.data.showDifferenceReason, false);
+  assert.equal(page.data.differenceReason, '');
+});
+
 test('receiving submits a short quantity with fewer pallets and its reason', async () => {
   const requests = [];
+  const toasts = [];
   const session = {
     user: { username: 'receiver' },
     warehouseId: 1,
@@ -140,12 +224,14 @@ test('receiving submits a short quantity with fewer pallets and its reason', asy
     upload: async () => ({ photo: { photo_id: 'photo-1' } }),
   });
   global.wx = {
-    showToast: () => {},
+    showToast: (options) => toasts.push(options.title),
     showModal: () => {},
+    pageScrollTo: () => {},
   };
 
   const page = instantiate(loadPage('pages/receive/index.js'));
   page.data.session = session;
+  page.data.selectedManifestId = 'manifest-1';
   page.data.selectedTicket = {
     ticket_id: 'ticket-1',
     declared_quantity: '4.000',
@@ -160,6 +246,26 @@ test('receiving submits a short quantity with fewer pallets and its reason', asy
   }];
   page.data.quantity = '2';
   page.data.differenceReason = '少 2 件，余货明天补到';
+  page.openManifest = async () => {
+    page.data.selectedManifest = {
+      tickets: [
+        {
+          ticket_id: 'ticket-1',
+          status: 'CLOSED',
+          can_receive: false,
+        },
+        {
+          ticket_id: 'ticket-2',
+          status: 'EXPECTED',
+          can_receive: true,
+          declared_quantity: '6.000',
+          received_quantity: '0.000',
+          expected_pallet_count: 1,
+        },
+      ],
+    };
+    return true;
+  };
 
   await page.confirmReceipt();
 
@@ -169,6 +275,337 @@ test('receiving submits a short quantity with fewer pallets and its reason', asy
   assert.equal(requests[0].data.pallets.length, 1);
   assert.equal(requests[0].data.pallets[0].label_recognition_id, 'recognition-1');
   assert.equal(requests[0].data.difference_reason, '少 2 件，余货明天补到');
+  assert.equal(page.data.selectedTicket.ticket_id, 'ticket-2');
+  assert.equal(page.data.quantity, '6');
+  assert.ok(toasts.includes('已收货，继续下一票'));
+});
+
+test('a partial receipt does not claim the manifest is complete', async () => {
+  const toasts = [];
+  const session = {
+    user: { username: 'receiver' },
+    warehouseId: 1,
+  };
+  installMock('utils/session.js', {
+    requireSession: () => session,
+  });
+  installMock('utils/request.js', {
+    request: async () => ({
+      ticket: { item_name: '船用支架', received_quantity: '2.000' },
+      receipt: { location_path_snapshot: 'A 区 / A1' },
+    }),
+    upload: async () => ({}),
+  });
+  global.wx = {
+    showToast: (options) => toasts.push(options.title),
+    showModal: () => {},
+    pageScrollTo: () => {},
+  };
+
+  const page = instantiate(loadPage('pages/receive/index.js'));
+  page.data.session = session;
+  page.data.selectedManifestId = 'manifest-1';
+  page.data.selectedTicket = {
+    ticket_id: 'ticket-1',
+    declared_quantity: '4.000',
+    received_quantity: '0.000',
+    expected_pallet_count: 2,
+    pallet_count: 0,
+  };
+  page.data.scans = [{
+    suffix: '1-1',
+    recognition: { recognition_id: 'recognition-1' },
+    photo: { photo_id: 'photo-1' },
+  }];
+  page.data.quantity = '2';
+  page.data.differenceReason = '少 2 件，余货明天补到';
+  page.openManifest = async () => {
+    page.data.selectedManifest = {
+      tickets: [{
+        ticket_id: 'ticket-1',
+        status: 'PARTIAL',
+        can_receive: true,
+        declared_quantity: '4.000',
+        received_quantity: '2.000',
+        expected_pallet_count: 2,
+      }],
+    };
+    return true;
+  };
+
+  await page.confirmReceipt();
+
+  assert.ok(toasts.includes('本次已记录，还需继续补收'));
+  assert.equal(toasts.includes('本清单已全部收完'), false);
+});
+
+test('receiving can defer an undelivered ticket to the next batch', async () => {
+  const requests = [];
+  const session = {
+    user: { username: 'receiver' },
+    warehouseId: 1,
+  };
+  installMock('utils/session.js', {
+    requireSession: () => session,
+  });
+  installMock('utils/request.js', {
+    request: async (options) => {
+      requests.push(options);
+      return {
+        ticket: {
+          delivery_status: 'DEFERRED',
+          deferred_to_date: '2026-10-30',
+        },
+      };
+    },
+    upload: async () => ({}),
+  });
+  const answers = [
+    { confirm: true, content: '2026-10-30' },
+    { confirm: true, content: '车辆装不下，随下一批送达' },
+  ];
+  global.wx = {
+    showModal: (options) => options.success(answers.shift()),
+    showToast: () => {},
+  };
+
+  const page = instantiate(loadPage('pages/receive/index.js'));
+  page.data.session = session;
+  page.data.selectedManifestId = 'manifest-1';
+  page.data.selectedManifest = {
+    tickets: [{
+      ticket_id: 'ticket-1',
+      declared_quantity: '6.000',
+      received_quantity: '0.000',
+      status: 'EXPECTED',
+      can_defer: true,
+    }],
+  };
+  page.openManifest = async () => true;
+
+  await page.deferTicket({
+    currentTarget: { dataset: { id: 'ticket-1' } },
+  });
+
+  assert.equal(requests.length, 1);
+  assert.equal(
+    requests[0].path,
+    '/shipyard/inbound/tickets/ticket-1/deferral',
+  );
+  assert.equal(requests[0].method, 'POST');
+  assert.equal(requests[0].data.next_batch_date, '2026-10-30');
+  assert.equal(requests[0].data.reason, '车辆装不下，随下一批送达');
+});
+
+test('receiving recognizes and retains a complete four-part arrival slip in one action', async () => {
+  const uploads = [];
+  const session = {
+    user: { username: 'receiver' },
+    warehouseId: 1,
+  };
+  installMock('utils/session.js', {
+    requireSession: () => session,
+  });
+  installMock('utils/request.js', {
+    request: async () => ({}),
+    upload: async (options) => {
+      uploads.push(options);
+      if (options.path.endsWith('/recognize')) {
+        return {
+          fields: {
+            slip_no: '0920156',
+            delivery_note_no: '920156',
+            supplier_name: '宝应帆洋船舶电器配件制造有限公司',
+            engineering_no: 'H1405',
+            purchase_order_no: 'SWS202607080016',
+          },
+          missing_labels: [],
+          message: '已自动识别，请核对验收单信息。',
+        };
+      }
+      return { arrival_slips: [] };
+    },
+  });
+  global.wx = {
+    chooseMedia: async () => ({
+      tempFiles: [{ tempFilePath: '/tmp/arrival-slip.jpg' }],
+    }),
+    showToast: () => {},
+    showModal: () => {},
+  };
+
+  const page = instantiate(loadPage('pages/receive/index.js'));
+  page.data.session = session;
+  page.data.selectedManifestId = 'manifest-1';
+  page.data.arrivalSlipForm = {
+    slip_no: '',
+    delivery_note_no: '',
+    supplier_name: '',
+    engineering_no: '',
+    purchase_order_no: '',
+  };
+  page.openManifest = async () => true;
+
+  await page.captureArrivalSlip();
+  assert.equal(uploads.length, 2);
+  assert.equal(
+    uploads[0].path,
+    '/shipyard/inbound/manifests/manifest-1/arrival-slips/recognize',
+  );
+  assert.equal(page.data.arrivalSlipExpanded, false);
+  assert.equal(page.data.arrivalSlipPhotoPath, '');
+
+  assert.equal(
+    uploads[1].path,
+    '/shipyard/inbound/manifests/manifest-1/arrival-slips',
+  );
+  assert.equal(uploads[1].formData.slip_no, '0920156');
+  assert.equal(uploads[1].formData.factory_copy_count, '2');
+  assert.equal(uploads[1].formData.shipyard_copy_count, '2');
+  assert.equal(uploads[1].formData.warehouse_copy_retained, 'true');
+});
+
+test('receiving keeps an incomplete arrival slip editable instead of blocking the user', async () => {
+  const uploads = [];
+  const session = {
+    user: { username: 'receiver' },
+    warehouseId: 1,
+  };
+  installMock('utils/session.js', {
+    requireSession: () => session,
+  });
+  installMock('utils/request.js', {
+    request: async () => ({}),
+    upload: async (options) => {
+      uploads.push(options);
+      return {
+        fields: { slip_no: '0920156' },
+        missing_labels: ['送货单号', '供应商'],
+        message: '未能完整识别，请补充验收单信息。',
+      };
+    },
+  });
+  global.wx = {
+    chooseMedia: async () => ({
+      tempFiles: [{ tempFilePath: '/tmp/arrival-slip.jpg' }],
+    }),
+    showToast: () => {},
+    showModal: () => {},
+  };
+
+  const page = instantiate(loadPage('pages/receive/index.js'));
+  page.data.session = session;
+  page.data.selectedManifestId = 'manifest-1';
+  page.data.arrivalSlipForm = {
+    slip_no: '',
+    delivery_note_no: '',
+    supplier_name: '',
+    engineering_no: '',
+    purchase_order_no: '',
+  };
+
+  await page.captureArrivalSlip();
+
+  assert.equal(uploads.length, 1);
+  assert.equal(page.data.arrivalSlipPhotoPath, '/tmp/arrival-slip.jpg');
+  assert.equal(page.data.arrivalSlipExpanded, true);
+  assert.equal(page.data.arrivalSlipForm.slip_no, '0920156');
+  assert.match(page.data.arrivalSlipMessage, /送货单号/);
+  assert.match(page.data.arrivalSlipMessage, /供应商/);
+});
+
+test('switching manifests clears the previous arrival-slip fields', async () => {
+  const session = {
+    user: { username: 'receiver' },
+    warehouseId: 1,
+  };
+  installMock('utils/session.js', {
+    requireSession: () => session,
+  });
+  installMock('utils/request.js', {
+    request: async () => ({
+      manifest: {
+        manifest_id: 'manifest-2',
+        manifest_no: 'IN-2',
+        metadata: { manufacturer_name: '新供应商' },
+      },
+      tickets: [],
+      arrival_slips: [],
+    }),
+    upload: async () => ({}),
+  });
+  global.wx = {
+    showToast: () => {},
+  };
+
+  const page = instantiate(loadPage('pages/receive/index.js'));
+  page.data.session = session;
+  page.data.selectedManifestId = 'manifest-1';
+  page.data.arrivalSlipForm = {
+    slip_no: 'OLD-SLIP',
+    delivery_note_no: 'OLD-DELIVERY',
+    supplier_name: '旧供应商',
+    engineering_no: 'H-OLD',
+    purchase_order_no: 'PO-OLD',
+  };
+
+  await page.openManifest('manifest-2');
+
+  assert.equal(page.data.arrivalSlipForm.slip_no, '');
+  assert.equal(page.data.arrivalSlipForm.delivery_note_no, '');
+  assert.equal(page.data.arrivalSlipForm.engineering_no, '');
+  assert.equal(page.data.arrivalSlipForm.purchase_order_no, '');
+  assert.equal(page.data.arrivalSlipForm.supplier_name, '新供应商');
+});
+
+test('a saved arrival slip can be corrected without replacing its photo', async () => {
+  const requests = [];
+  const session = {
+    user: { username: 'receiver' },
+    warehouseId: 1,
+  };
+  installMock('utils/session.js', {
+    requireSession: () => session,
+  });
+  installMock('utils/request.js', {
+    request: async (options) => {
+      requests.push(options);
+      return { arrival_slips: [] };
+    },
+    upload: async () => ({}),
+  });
+  global.wx = {
+    showToast: () => {},
+  };
+
+  const page = instantiate(loadPage('pages/receive/index.js'));
+  page.data.session = session;
+  page.data.selectedManifestId = 'manifest-1';
+  page.data.selectedManifest = {
+    arrival_slips: [{
+      arrival_slip_id: 'slip-1',
+      slip_no: 'WRONG',
+      delivery_note_no: '920156',
+      supplier_name: '供应商',
+      engineering_no: 'H1405',
+      purchase_order_no: 'PO-1',
+    }],
+  };
+  page.openManifest = async () => true;
+
+  page.editSavedArrivalSlip({
+    currentTarget: { dataset: { id: 'slip-1' } },
+  });
+  page.data.arrivalSlipForm.slip_no = 'CORRECTED';
+  await page.saveArrivalSlip();
+
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].method, 'PUT');
+  assert.equal(
+    requests[0].path,
+    '/shipyard/inbound/arrival-slips/slip-1',
+  );
+  assert.equal(requests[0].data.slip_no, 'CORRECTED');
 });
 
 test('outbound asks only for the remaining suffix when OCR misses it', async () => {
@@ -954,6 +1391,7 @@ test('receiving persists an in-flight marker before awaiting the response', asyn
   page.data.session = session;
   page.draftScope = 'receipt:receiver:1';
   page.data.selectedManifestId = 'manifest-1';
+  page.openManifest = async () => true;
   page.data.selectedTicket = {
     ticket_id: 'ticket-1',
     declared_quantity: '4.000',

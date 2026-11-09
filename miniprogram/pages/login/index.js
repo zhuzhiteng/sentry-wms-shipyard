@@ -2,13 +2,11 @@ const { request } = require('../../utils/request');
 const {
   getApiBase,
   getSession,
-  normalizeApiBase,
   saveSession,
 } = require('../../utils/session');
 
 Page({
   data: {
-    apiBase: '',
     username: '',
     password: '',
     busy: false,
@@ -20,11 +18,6 @@ Page({
       wx.reLaunch({ url: '/pages/home/index' });
       return;
     }
-    this.setData({ apiBase: getApiBase() });
-  },
-
-  onApiBaseInput(event) {
-    this.setData({ apiBase: event.detail.value });
   },
 
   onUsernameInput(event) {
@@ -36,9 +29,9 @@ Page({
   },
 
   async login() {
-    const apiBase = normalizeApiBase(this.data.apiBase);
-    if (!apiBase || !this.data.username.trim() || !this.data.password) {
-      wx.showToast({ title: '请填写服务器、账号和密码', icon: 'none' });
+    const apiBase = getApiBase();
+    if (!this.data.username.trim() || !this.data.password) {
+      wx.showToast({ title: '请输入账号和密码', icon: 'none' });
       return;
     }
     this.setData({ busy: true });

@@ -13,6 +13,102 @@
   margin-top: 18rpx;
 }
 
+.quantity-hint {
+  margin-top: 8rpx;
+  line-height: 1.5;
+}
+
+.quantity-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin-top: 20rpx;
+  padding: 20rpx 22rpx;
+  border-radius: 14rpx;
+  background: #eef5f9;
+}
+
+.quantity-value {
+  margin-top: 4rpx;
+  color: #174b70;
+  font-size: 42rpx;
+  font-weight: 700;
+}
+
+.quantity-edit {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 18rpx;
+  min-height: 88rpx;
+  border-radius: 10rpx;
+  color: #80520d;
+  background: #fff3d9;
+  font-size: 23rpx;
+  line-height: 88rpx;
+}
+
+.quantity-edit::after {
+  border: 0;
+}
+
+.quantity-edit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.quantity-reset {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 18rpx;
+  min-height: 88rpx;
+  border-radius: 10rpx;
+  color: #1f5d89;
+  background: #e8f0f5;
+  font-size: 23rpx;
+  font-weight: 600;
+  line-height: 88rpx;
+}
+
+.quantity-reset::after {
+  border: 0;
+}
+
+.arrival-slip-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  margin-top: 18rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 14rpx;
+  color: #314b5f;
+  background: #f3f7f9;
+  font-size: 24rpx;
+}
+
+.arrival-slip-summary .muted {
+  display: inline-block;
+  min-width: 130rpx;
+  color: #5f7080;
+}
+
+.arrival-slip-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 16rpx;
+  min-height: 88rpx;
+  padding: 0 20rpx;
+  border-radius: 12rpx;
+  color: #1f5d89;
+  background: #f1f5f8;
+  font-size: 24rpx;
+  font-weight: 600;
+  text-align: center;
+}
+
 .time {
   font-size: 22rpx;
   font-weight: 500;
@@ -67,9 +163,9 @@
 }
 
 .scan-photo {
-  flex: 0 0 88rpx;
-  width: 88rpx;
-  height: 88rpx;
+  flex: 0 0 104rpx;
+  width: 104rpx;
+  height: 104rpx;
   border-radius: 10rpx;
   background: #eef5f9;
 }
@@ -87,12 +183,12 @@
 .mini-action {
   margin: 0;
   padding: 0 16rpx;
-  min-height: 56rpx;
+  min-height: 88rpx;
   color: #8a3030;
   background: #fbeaea;
   border-radius: 10rpx;
   font-size: 22rpx;
-  line-height: 56rpx;
+  line-height: 88rpx;
 }
 
 .mini-action::after {

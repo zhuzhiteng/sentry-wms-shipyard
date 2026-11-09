@@ -110,12 +110,36 @@ manufacturer_name` 只能存在一条有效绑定。
 
 当前验证样例：
 
-- 工作表：`外高桥 `；
+- 工作表：`Sheet2`；
 - 表头行：第 3 行；
-- 业务行：36；
+- 业务行：66；
 - 船号：7；
-- 合计件数：2,326；
-- `Sheet1`：识别为辅助页并忽略。
+- 送货单号：19；
+- 合计件数：6,043；
+- 第 70-71 行公司页脚：不导入。
+
+清单行仍然表示一个托盘或托组，`件数`表示整行总件数。物料编码和型号规格
+可能为空，当前样例以`船号 + 图号 + 送货单号 + 来源行号`识别货物。
+
+## 到货批次顺延与四联验收单
+
+- `POST /api/shipyard/inbound/tickets/<ticket_id>/deferral`
+- `DELETE /api/shipyard/inbound/tickets/<ticket_id>/deferral`
+- `POST /api/shipyard/inbound/manifests/<manifest_id>/arrival-slips/recognize`
+- `POST /api/shipyard/inbound/manifests/<manifest_id>/arrival-slips`
+- `PUT /api/shipyard/inbound/arrival-slips/<arrival_slip_id>`
+- `GET /api/shipyard/inbound/arrival-slips/<arrival_slip_id>/file`
+
+小程序正常路径先拍摄整张四联验收单，`recognize` 接口返回验收单号、送货单号、
+供应商、工程号和采购单号的建议值。必填字段齐全时照片和识别结果直接留存；缺少
+验收单号、送货单号或供应商时才展开补充，不要求开始收货前手工录完五项。
+自动保存后如发现识别信息有误，可修改已保存验收单的号段和工程信息，原照片不替换。
+
+票货可标记为`PENDING`、`DEFERRED`、`PARTIAL`或`RECEIVED`。顺延下批必须记录
+下一批预计日期和原因，不删除原票货；下一次实收后自动清除顺延标记。
+
+四联验收单以图片留证，同时记录工厂带回联数、船厂留存联数和仓库是否已复印
+留存。默认口径为工厂 2 联、船厂 2 联、仓库复印件 1 份。
 
 ## 验证命令
 

@@ -29,6 +29,29 @@ const STATUS_LABELS = {
   EXCEPTION: '异常',
 };
 
+const DELIVERY_LABELS = {
+  PENDING: '本批未到',
+  DEFERRED: '顺延下批',
+  PARTIAL: '部分到货',
+  RECEIVED: '已到齐',
+};
+
+function emptyArrivalSlipForm() {
+  return {
+    slip_no: '',
+    delivery_note_no: '',
+    supplier_name: '',
+    engineering_no: '',
+    purchase_order_no: '',
+  };
+}
+
+function deliveryClass(status) {
+  if (status === 'RECEIVED') return 'chip-success';
+  if (status === 'PARTIAL' || status === 'DEFERRED') return 'chip-warning';
+  return '';
+}
+
 function statusClass(status) {
   if (['CLOSED', 'RECEIVED', 'IN_STOCK'].includes(status)) return 'chip-success';
   if (['PARTIAL', 'EXCEPTION'].includes(status)) return 'chip-warning';
@@ -59,6 +82,8 @@ Page({
     scans: [],
     quantity: '',
     differenceReason: '',
+    showDifferenceReason: false,
+    editQuantity: false,
     busy: false,
     submitUncertain: false,
     loading: false,
@@ -67,6 +92,12 @@ Page({
     nextSuffix: '',
     palletProgressText: '',
     remainingQuantityText: '',
+    arrivalSlipPhotoPath: '',
+    arrivalSlipExpanded: false,
+    arrivalSlipMessage: '',
+    arrivalSlipSavedCount: 0,
+    editingArrivalSlipId: '',
+    arrivalSlipForm: emptyArrivalSlipForm(),
   },
 
   onLoad() {
@@ -108,7 +139,7 @@ Page({
       });
       const manifests = (data.manifests || []).map((item) => ({
         ...item,
-        status_label: STATUS_LABELS[item.status] || item.status,
+        status_label: STATUS_LABELS[item.status] || '状态待确认',
         status_class: statusClass(item.status),
       }));
       this.setData({ manifests });
@@ -156,7 +187,7 @@ Page({
       );
       wx.showModal({
         title: '上次操作已处理',
-        content: '任务状态已经变化，草稿已清理。请按最新票货状态操作。',
+        content: '货物状态已经变化，草稿已清理。请按最新货物状态操作。',
         showCancel: false,
       });
       return;
@@ -164,13 +195,19 @@ Page({
     const scans = Array.isArray(draft.scans) ? draft.scans : [];
     const progress = scanProgress(ticket, scans);
     const remaining = numberText(remainingQuantity(ticket));
+    const quantity = draft.quantity || remaining;
+    const showDifferenceReason = Number(quantity) < Number(remaining);
     this.skipDraftPersist = false;
     this.submissionPending = false;
     this.setData({
       selectedTicket: ticket,
       scans,
-      quantity: draft.quantity || remaining,
-      differenceReason: draft.difference_reason || '',
+      quantity,
+      differenceReason: showDifferenceReason
+        ? (draft.difference_reason || '')
+        : '',
+      showDifferenceReason,
+      editQuantity: showDifferenceReason,
       submitUncertain: Boolean(
         draft.submit_uncertain || draft.submission_pending,
       ),
@@ -188,24 +225,50 @@ Page({
   async openManifest(manifestId) {
     this.setData({ busy: true });
     try {
+      const manifestChanged = this.data.selectedManifestId !== manifestId;
       const data = await request({
         path: `/shipyard/inbound/manifests/${manifestId}`,
       });
       const tickets = (data.tickets || []).map((ticket) => ({
         ...ticket,
-        status_label: STATUS_LABELS[ticket.status] || ticket.status,
+        status_label: STATUS_LABELS[ticket.status] || '状态待确认',
         status_class: statusClass(ticket.status),
+        delivery_label: DELIVERY_LABELS[ticket.delivery_status] || '本批未到',
+        delivery_class: deliveryClass(ticket.delivery_status),
+        deferred_text: ticket.deferred_to_date
+          ? `顺延至 ${ticket.deferred_to_date}：${ticket.deferred_reason || ''}`
+          : '',
         short_quantity_text: numberText(ticket.short_quantity),
         remaining_quantity_text: numberText(remainingQuantity(ticket)),
         pallet_progress_text: scanProgress(ticket, []).text,
         can_receive: ['EXPECTED', 'PARTIAL'].includes(ticket.status),
+        can_defer: ['EXPECTED', 'PARTIAL'].includes(ticket.status)
+          && remainingQuantity(ticket) > 0,
       }));
       const selectedManifest = { ...data, tickets };
+      const supplierName = data.manifest?.metadata?.manufacturer_name
+        || (manifestChanged ? '' : this.data.arrivalSlipForm.supplier_name)
+        || '';
       this.setData({
         selectedManifest,
         selectedManifestId: manifestId,
         selectedTicket: null,
         scans: [],
+        arrivalSlipSavedCount: (data.arrival_slips || []).length,
+        ...(manifestChanged
+          ? {
+            arrivalSlipPhotoPath: '',
+            arrivalSlipExpanded: false,
+            arrivalSlipMessage: '',
+            editingArrivalSlipId: '',
+          }
+          : {}),
+        arrivalSlipForm: manifestChanged
+          ? { ...emptyArrivalSlipForm(), supplier_name: supplierName }
+          : {
+            ...this.data.arrivalSlipForm,
+            supplier_name: supplierName || this.data.arrivalSlipForm.supplier_name,
+          },
       });
       return true;
     } catch (error) {
@@ -225,22 +288,25 @@ Page({
   },
 
   startTicket(event) {
+    this.beginTicket(event.currentTarget.dataset.id);
+  },
+
+  beginTicket(ticketId) {
     if (this.data.busy || this.submissionPending) {
       wx.showToast({ title: '正在提交，请等待结果', icon: 'none' });
-      return;
+      return false;
     }
     if (this.data.submitUncertain) {
       wx.showToast({ title: '上次提交结果未确认，请先重试', icon: 'none' });
-      return;
+      return false;
     }
-    const ticketId = event.currentTarget.dataset.id;
     const ticket = this.data.selectedManifest.tickets.find(
       (item) => item.ticket_id === ticketId,
     );
-    if (!ticket) return;
+    if (!ticket) return false;
     if (!['EXPECTED', 'PARTIAL'].includes(ticket.status)) {
       wx.showToast({ title: '该票当前不能收货', icon: 'none' });
-      return;
+      return false;
     }
     const remaining = Math.max(
       remainingQuantity(ticket),
@@ -263,12 +329,311 @@ Page({
       scans: [],
       quantity: numberText(remaining),
       differenceReason: '',
+      showDifferenceReason: false,
+      editQuantity: false,
       submitUncertain: false,
       palletProgressText: progress.text,
       remainingQuantityText: numberText(remaining),
     });
     this.persistDraft();
-    wx.pageScrollTo({ selector: '#ticket-workbench', duration: 250 });
+    const scrollToWorkbench = () => wx.pageScrollTo({
+      selector: '#ticket-workbench',
+      duration: 250,
+    });
+    if (typeof wx.nextTick === 'function') {
+      wx.nextTick(scrollToWorkbench);
+    } else {
+      scrollToWorkbench();
+    }
+    return true;
+  },
+
+  nextReceivableTicketId(afterTicketId) {
+    const tickets = this.data.selectedManifest?.tickets || [];
+    const afterIndex = tickets.findIndex(
+      (ticket) => ticket.ticket_id === afterTicketId,
+    );
+    const ordered = afterIndex >= 0
+      ? [...tickets.slice(afterIndex + 1), ...tickets.slice(0, afterIndex)]
+      : tickets;
+    return ordered.find(
+      (ticket) => ticket.can_receive && ticket.ticket_id !== afterTicketId,
+    )?.ticket_id || '';
+  },
+
+  async deferTicket(event) {
+    if (this.data.busy || this.submissionPending) return;
+    const ticketId = event.currentTarget.dataset.id;
+    const ticket = this.data.selectedManifest?.tickets?.find(
+      (item) => item.ticket_id === ticketId,
+    );
+    if (!ticket?.can_defer) return;
+    const dateResult = await new Promise((resolve) => {
+      wx.showModal({
+        title: '顺延到下一批',
+        content: '请输入下一批预计到货日期。',
+        editable: true,
+        placeholderText: 'YYYY-MM-DD',
+        success: resolve,
+        fail: () => resolve({ confirm: false }),
+      });
+    });
+    if (!dateResult.confirm) return;
+    const nextBatchDate = String(dateResult.content || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(nextBatchDate)) {
+      wx.showToast({ title: '日期格式应为 YYYY-MM-DD', icon: 'none' });
+      return;
+    }
+    const reasonResult = await new Promise((resolve) => {
+      wx.showModal({
+        title: '顺延原因',
+        content: '例如：车辆装不下，随下一批送达',
+        editable: true,
+        placeholderText: '本批未装原因',
+        success: resolve,
+        fail: () => resolve({ confirm: false }),
+      });
+    });
+    if (!reasonResult.confirm) return;
+    const reason = String(reasonResult.content || '').trim();
+    if (!reason) {
+      wx.showToast({ title: '请填写顺延原因', icon: 'none' });
+      return;
+    }
+    this.setData({ busy: true });
+    try {
+      await request({
+        path: `/shipyard/inbound/tickets/${ticketId}/deferral`,
+        method: 'POST',
+        data: {
+          next_batch_date: nextBatchDate,
+          reason,
+        },
+      });
+      wx.showToast({ title: '已标记顺延下批', icon: 'success' });
+      await this.openManifest(this.data.selectedManifestId);
+    } catch (error) {
+      wx.showToast({ title: error.message, icon: 'none' });
+    } finally {
+      this.setData({ busy: false });
+    }
+  },
+
+  onArrivalSlipInput(event) {
+    const field = event.currentTarget.dataset.field;
+    this.setData({
+      arrivalSlipForm: {
+        ...this.data.arrivalSlipForm,
+        [field]: event.detail.value,
+      },
+    });
+  },
+
+  toggleArrivalSlipDetails() {
+    if (this.data.busy) return;
+    this.setData({
+      arrivalSlipExpanded: !this.data.arrivalSlipExpanded,
+    });
+  },
+
+  editSavedArrivalSlip(event) {
+    const arrivalSlipId = event.currentTarget.dataset.id;
+    const slip = (this.data.selectedManifest?.arrival_slips || []).find(
+      (item) => item.arrival_slip_id === arrivalSlipId,
+    );
+    if (!slip) return;
+    this.setData({
+      editingArrivalSlipId: arrivalSlipId,
+      arrivalSlipPhotoPath: '',
+      arrivalSlipExpanded: true,
+      arrivalSlipMessage: '请核对并保存修改。',
+      arrivalSlipForm: {
+        slip_no: slip.slip_no || '',
+        delivery_note_no: slip.delivery_note_no || '',
+        supplier_name: slip.supplier_name || '',
+        engineering_no: slip.engineering_no || '',
+        purchase_order_no: slip.purchase_order_no || '',
+      },
+    });
+  },
+
+  async persistArrivalSlip(photoPath, form) {
+    return upload({
+      path: `/shipyard/inbound/manifests/${this.data.selectedManifestId}/arrival-slips`,
+      filePath: photoPath,
+      timeout: 45000,
+      formData: {
+        slip_no: form.slip_no.trim(),
+        delivery_note_no: form.delivery_note_no.trim(),
+        supplier_name: form.supplier_name.trim(),
+        engineering_no: String(form.engineering_no || '').trim(),
+        purchase_order_no: String(form.purchase_order_no || '').trim(),
+        factory_copy_count: '2',
+        shipyard_copy_count: '2',
+        warehouse_copy_retained: 'true',
+      },
+    });
+  },
+
+  clearArrivalSlipDraft(form) {
+    this.setData({
+      arrivalSlipPhotoPath: '',
+      arrivalSlipExpanded: false,
+      arrivalSlipMessage: '',
+      editingArrivalSlipId: '',
+      arrivalSlipForm: {
+        ...form,
+        slip_no: '',
+        delivery_note_no: '',
+      },
+    });
+  },
+
+  async captureArrivalSlip() {
+    if (!this.data.selectedManifestId || this.data.busy) return;
+    if (this.data.selectedTicket) {
+      wx.showToast({ title: '请先完成当前货物收货', icon: 'none' });
+      return;
+    }
+    this.setData({ editingArrivalSlipId: '' });
+    this.setData({ busy: true });
+    try {
+      const media = await wx.chooseMedia({
+        count: 1,
+        mediaType: ['image'],
+        sourceType: ['camera'],
+        sizeType: ['compressed'],
+      });
+      const photoPath = media.tempFiles[0].tempFilePath;
+      this.setData({ arrivalSlipPhotoPath: photoPath });
+      const recognized = await upload({
+        path: `/shipyard/inbound/manifests/${this.data.selectedManifestId}/arrival-slips/recognize`,
+        filePath: photoPath,
+        timeout: 45000,
+      });
+      const fields = recognized.fields || {};
+      const form = {
+        slip_no: String(fields.slip_no || this.data.arrivalSlipForm.slip_no || ''),
+        delivery_note_no: String(
+          fields.delivery_note_no
+          || this.data.arrivalSlipForm.delivery_note_no
+          || '',
+        ),
+        supplier_name: String(
+          fields.supplier_name
+          || this.data.arrivalSlipForm.supplier_name
+          || '',
+        ),
+        engineering_no: String(
+          fields.engineering_no
+          || this.data.arrivalSlipForm.engineering_no
+          || '',
+        ),
+        purchase_order_no: String(
+          fields.purchase_order_no
+          || this.data.arrivalSlipForm.purchase_order_no
+          || '',
+        ),
+      };
+      const missingLabels = [
+        ['slip_no', '验收单号'],
+        ['delivery_note_no', '送货单号'],
+        ['supplier_name', '供应商'],
+      ]
+        .filter(([field]) => !String(form[field] || '').trim())
+        .map(([, label]) => label);
+      this.setData({ arrivalSlipForm: form });
+      if (!missingLabels.length) {
+        await this.persistArrivalSlip(photoPath, form);
+        this.clearArrivalSlipDraft(form);
+        wx.showToast({ title: '四联验收单已保存', icon: 'success' });
+        const refreshed = await this.openManifest(this.data.selectedManifestId);
+        if (!refreshed) {
+          wx.showToast({
+            title: '已保存，刷新失败，请下拉刷新',
+            icon: 'none',
+          });
+        }
+        return;
+      }
+      this.setData({
+        arrivalSlipPhotoPath: photoPath,
+        arrivalSlipForm: form,
+        arrivalSlipExpanded: missingLabels.length > 0,
+        arrivalSlipMessage: missingLabels.length
+          ? `还缺${missingLabels.join('、')}，请补充。`
+          : '信息已自动读出，请核对验收单。',
+      });
+      wx.showToast({
+        title: missingLabels.length ? '请补充验收单信息' : '验收单信息已读出',
+        icon: 'none',
+      });
+    } catch (error) {
+      if (error.errMsg && error.errMsg.includes('cancel')) return;
+      this.setData({
+        arrivalSlipExpanded: true,
+        arrivalSlipMessage: '照片已保留，请核对或补充验收单信息。',
+      });
+      wx.showToast({ title: '请补充验收单信息', icon: 'none' });
+    } finally {
+      this.setData({ busy: false });
+    }
+  },
+
+  async saveArrivalSlip() {
+    if (
+      (!this.data.arrivalSlipPhotoPath && !this.data.editingArrivalSlipId)
+      || this.data.busy
+    ) return;
+    const form = this.data.arrivalSlipForm;
+    const editingArrivalSlipId = this.data.editingArrivalSlipId;
+    const missing = [
+      ['slip_no', '验收单号'],
+      ['delivery_note_no', '送货单号'],
+      ['supplier_name', '供应商'],
+    ].filter(([field]) => !String(form[field] || '').trim());
+    if (missing.length) {
+      this.setData({ arrivalSlipExpanded: true });
+      wx.showToast({
+        title: `请填写${missing.map(([, label]) => label).join('、')}`,
+        icon: 'none',
+      });
+      return;
+    }
+    this.setData({ busy: true });
+    try {
+      if (editingArrivalSlipId) {
+        await request({
+          path: `/shipyard/inbound/arrival-slips/${editingArrivalSlipId}`,
+          method: 'PUT',
+          data: {
+            slip_no: form.slip_no.trim(),
+            delivery_note_no: form.delivery_note_no.trim(),
+            supplier_name: form.supplier_name.trim(),
+            engineering_no: String(form.engineering_no || '').trim() || null,
+            purchase_order_no: String(form.purchase_order_no || '').trim() || null,
+          },
+        });
+      } else {
+        await this.persistArrivalSlip(this.data.arrivalSlipPhotoPath, form);
+      }
+      this.clearArrivalSlipDraft(form);
+      wx.showToast({
+        title: editingArrivalSlipId ? '修改已保存' : '四联验收单已留存',
+        icon: 'success',
+      });
+      const refreshed = await this.openManifest(this.data.selectedManifestId);
+      if (!refreshed) {
+        wx.showToast({
+          title: '已保存，刷新失败，请下拉刷新',
+          icon: 'none',
+        });
+      }
+    } catch (error) {
+      wx.showToast({ title: error.message, icon: 'none' });
+    } finally {
+      this.setData({ busy: false });
+    }
   },
 
   async captureLabel() {
@@ -332,19 +697,19 @@ Page({
         palletProgressText: progress.text,
       });
       this.persistDraft();
-      wx.showToast({ title: `托盘 ${suffix} 已识别`, icon: 'success' });
+      wx.showToast({ title: `托盘 ${suffix} 已核对`, icon: 'success' });
     } catch (error) {
       if (error.errMsg && error.errMsg.includes('cancel')) return;
       this.showLabelError(
         error.response?.data?.mismatches || [],
-        error.message || '吊牌识别失败，请重拍',
+        error.message || '吊牌没有读全，请重拍',
       );
     } finally {
       this.setData({ busy: false });
     }
   },
 
-  showLabelError(mismatches, fallback = '吊牌字段与当前票货不一致') {
+  showLabelError(mismatches, fallback = '吊牌与当前货物不一致') {
     const labels = {
       ship_no: '船号',
       engineering_no: '工程号',
@@ -353,32 +718,33 @@ Page({
       item_name: '品名',
       item_spec: '规格',
       label_quantity: '件数',
-      tag_suffix: '托盘后缀',
+      tag_suffix: '托盘编号',
     };
     const content = mismatches.length
       ? mismatches.slice(0, 4).map((item) => {
-        const label = labels[item.field] || item.field;
-        if (item.reason === 'REQUIRED') return `${label}未识别，请重拍`;
-        if (item.reason === 'DUPLICATE') return `${label} ${item.actual || ''} 已使用`;
+        const label = labels[item.field] || '吊牌内容';
+        if (item.reason === 'REQUIRED') return `${label}没读出来，请重拍`;
+        if (item.reason === 'DUPLICATE') return `${label} ${item.actual || ''} 已经用过`;
         if (item.reason === 'TOO_MANY') {
-          return `本票托盘数量已满，预计 ${item.expected} 托`;
+          return `这批货的托盘已经拍齐，应为 ${item.expected} 托`;
         }
-        return `${label}不一致，应为 ${item.expected || '—'}，识别为 ${item.actual || '—'}`;
+        return `${label}不一致，应为 ${item.expected || '—'}，照片上是 ${item.actual || '—'}`;
       }).join('\n')
       : fallback;
     wx.showModal({
-      title: '吊牌未通过',
-      content: `${content}\n\n照片已留证，本次未计入收货。`,
+      title: '吊牌没有对上',
+      content: `${content}\n\n照片已保存，这次没有算收货。`,
       showCancel: false,
       confirmText: '重拍',
     });
   },
 
   askSuffix() {
+    const page = this;
     return new Promise((resolve) => {
       wx.showModal({
-        title: '补录托盘后缀',
-        content: 'OCR 未读到后缀，请按吊牌核对后输入。',
+        title: '补填托盘编号',
+        content: '照片已保存，但没读全托盘编号。请对照吊牌填写。',
         editable: true,
         placeholderText: '例如 1-1',
         success(result) {
@@ -388,7 +754,9 @@ Page({
           }
           const suffix = normalizeSuffix(result.content);
           if (!suffix) {
-            wx.showToast({ title: '后缀格式应为 1-1', icon: 'none' });
+            wx.showToast({ title: '请按 1-1 的格式填写', icon: 'none' });
+            page.askSuffix().then(resolve);
+            return;
           }
           resolve(suffix);
         },
@@ -401,7 +769,35 @@ Page({
 
   onQuantityInput(event) {
     if (this.data.submitUncertain) return;
-    this.setData({ quantity: event.detail.value });
+    const quantity = event.detail.value;
+    const remaining = remainingQuantity(this.data.selectedTicket);
+    const showDifferenceReason = (
+      String(quantity).trim() !== ''
+      && Number(quantity) < Number(remaining)
+    );
+    this.setData({
+      quantity,
+      showDifferenceReason,
+      differenceReason: showDifferenceReason
+        ? this.data.differenceReason
+        : '',
+    });
+    this.persistDraft();
+  },
+
+  toggleQuantityEdit() {
+    if (this.data.submitUncertain) return;
+    this.setData({ editQuantity: true });
+  },
+
+  restoreFullQuantity() {
+    if (this.data.submitUncertain) return;
+    this.setData({
+      quantity: this.data.remainingQuantityText,
+      differenceReason: '',
+      showDifferenceReason: false,
+      editQuantity: false,
+    });
     this.persistDraft();
   },
 
@@ -491,7 +887,7 @@ Page({
     this.setData({ busy: true, submitUncertain: false });
     this.persistDraft();
     try {
-      const result = await request({
+      await request({
         path: `/shipyard/inbound/tickets/${selectedTicket.ticket_id}/receipts`,
         method: 'POST',
         data: body,
@@ -500,21 +896,44 @@ Page({
       this.submissionPending = false;
       clearDraft(this.draftScope);
       clearSubmissionKey(submissionScope);
-      wx.showModal({
-        title: '收货已完成',
-        content: `${result.ticket.item_name}\n实收 ${result.ticket.received_quantity} 件\n区域 ${result.receipt.location_path_snapshot}`,
-        showCancel: false,
-        success: () => {
-          this.setData({
-            selectedTicket: null,
-            scans: [],
-            nextSuffix: '',
-            palletProgressText: '',
-            remainingQuantityText: '',
-          });
-          this.loadManifests();
-        },
+      this.setData({
+        busy: false,
+        selectedTicket: null,
+        scans: [],
+        nextSuffix: '',
+        palletProgressText: '',
+        remainingQuantityText: '',
+        showDifferenceReason: false,
+        editQuantity: false,
       });
+      if (this.data.selectedManifestId) {
+        await this.openManifest(this.data.selectedManifestId);
+      }
+      const nextTicketId = this.nextReceivableTicketId(
+        selectedTicket.ticket_id,
+      );
+      if (nextTicketId) {
+        this.beginTicket(nextTicketId);
+        wx.showToast({ title: '已收货，继续下一票', icon: 'success' });
+      } else {
+        const unfinishedTicket = (
+          this.data.selectedManifest?.tickets || []
+        ).find(
+          (ticket) => (
+            ticket.ticket_id === selectedTicket.ticket_id
+            && ticket.can_receive
+            && remainingQuantity(ticket) > 0
+          ),
+        );
+        if (typeof wx.pageScrollTo === 'function') {
+          wx.pageScrollTo({ scrollTop: 0, duration: 250 });
+        }
+        if (unfinishedTicket) {
+          wx.showToast({ title: '本次已记录，还需继续补收', icon: 'none' });
+        } else {
+          wx.showToast({ title: '本清单已全部收完', icon: 'success' });
+        }
+      }
     } catch (error) {
       if (isAmbiguousSubmissionError(error)) {
         this.skipDraftPersist = false;
@@ -523,7 +942,7 @@ Page({
         this.persistDraft();
         wx.showModal({
           title: '提交结果未确认',
-          content: '网络中断或服务暂不可用，操作可能已经完成。请重试上次提交，系统不会重复入库。',
+          content: '网络中断或系统暂时不可用，操作可能已经完成。请再次确认收货，系统不会重复入库。',
           showCancel: false,
           confirmText: '知道了',
         });
@@ -536,7 +955,7 @@ Page({
         await this.loadManifests();
         wx.showModal({
           title: '状态已更新',
-          content: '该票货状态已经变化，已刷新最新任务。',
+          content: '货物状态已经变化，已刷新最新内容。',
           showCancel: false,
         });
       } else {

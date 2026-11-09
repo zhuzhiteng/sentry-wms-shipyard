@@ -39,6 +39,7 @@ from services.shipyard.errors import (
     WarehouseNotFoundError,
     ZoneConfigurationError,
 )
+from services.shipyard.inbound_document_service import list_arrival_slips
 from services.shipyard.manifest_parser import parse_inbound_workbook
 
 _BINDING_FIELD_LABELS = {
@@ -298,7 +299,9 @@ def get_manifest_payload(db, manifest_id: str) -> dict[str, Any]:
                    t.declared_quantity, t.received_quantity,
                    t.on_hand_quantity, t.assigned_bin_id,
                    t.location_path_snapshot, t.stock_lot_number, t.status
-                   , t.shortage_status,
+                   , t.shortage_status, t.delivery_status,
+                   t.deferred_to_date, t.deferred_reason,
+                   t.deferred_by, t.deferred_at,
                    (
                        SELECT COUNT(*)
                          FROM shipyard_pallet_units p
@@ -329,6 +332,11 @@ def get_manifest_payload(db, manifest_id: str) -> dict[str, Any]:
             "stock_lot_number": ticket.stock_lot_number,
             "status": ticket.status,
             "shortage_status": ticket.shortage_status,
+            "delivery_status": ticket.delivery_status,
+            "deferred_to_date": _iso(ticket.deferred_to_date),
+            "deferred_reason": ticket.deferred_reason,
+            "deferred_by": ticket.deferred_by,
+            "deferred_at": _iso(ticket.deferred_at),
             "pallet_count": ticket.pallet_count,
         }
         for ticket in tickets
@@ -386,6 +394,7 @@ def get_manifest_payload(db, manifest_id: str) -> dict[str, Any]:
         },
         "lines": line_payloads,
         "tickets": ticket_payloads,
+        "arrival_slips": list_arrival_slips(db, manifest_id),
         "validation": {
             "can_confirm": can_confirm,
             "missing_zone_ship_nos": sorted(set(missing_zone_ships)),
