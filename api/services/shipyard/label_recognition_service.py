@@ -11,7 +11,7 @@ from psycopg2.extras import Json
 from sqlalchemy import text
 
 from services.shipyard.errors import LabelRecognitionNotFoundError
-from services.shipyard.label_ocr import LabelOcrResult
+from services.shipyard.label_ocr import DEFAULT_PROVIDER, LabelOcrResult
 
 _REQUIRED_LABEL_FIELDS = {
     "ship_no",
@@ -36,13 +36,21 @@ def required_label_fields(
     *,
     expected: dict[str, Any] | None = None,
 ) -> frozenset[str]:
-    raw = os.getenv("SHIPYARD_OCR_REQUIRED_FIELDS", "")
-    configured = {
-        value.strip()
-        for value in raw.split(",")
-        if value.strip() in _REQUIRED_LABEL_FIELDS
-    }
-    fields = set(configured or _DEFAULT_REQUIRED_FIELDS)
+    override = (expected or {}).get("required_fields")
+    if override:
+        fields = {
+            str(value).strip()
+            for value in override
+            if str(value).strip() in _REQUIRED_LABEL_FIELDS
+        }
+    else:
+        raw = os.getenv("SHIPYARD_OCR_REQUIRED_FIELDS", "")
+        configured = {
+            value.strip()
+            for value in raw.split(",")
+            if value.strip() in _REQUIRED_LABEL_FIELDS
+        }
+        fields = set(configured or _DEFAULT_REQUIRED_FIELDS)
     if expected and str(expected.get("item_spec") or "").strip():
         fields.add("item_spec")
     return frozenset(fields)
@@ -106,7 +114,9 @@ def save_label_recognition(
             "provider": (
                 result.provider
                 if result
-                else (os.getenv("SHIPYARD_OCR_PROVIDER") or "baidu").strip().casefold()
+                else (os.getenv("SHIPYARD_OCR_PROVIDER") or DEFAULT_PROVIDER)
+                .strip()
+                .casefold()
             ),
             "status": status,
             "raw_text": result.raw_text if result else "",
