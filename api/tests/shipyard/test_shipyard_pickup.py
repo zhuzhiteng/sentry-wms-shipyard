@@ -246,7 +246,7 @@ def test_daily_pickup_keeps_warehouse_missing_lines_and_creates_whole_ticket_tas
     confirmed_outbound = client.post(
         f"/api/shipyard/outbound/tasks/{task['task_id']}/confirm",
         json={
-            "idempotency_key": "pickup-outbound-test-001",
+            "idempotency_key": "pickup-outbound",
             "pallets": [
                 {
                     "tag_suffix": "1-1",
