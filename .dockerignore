@@ -18,10 +18,13 @@
 
 # Top-level dirs not needed by api or its bake-in mappings
 admin/
+deploy/
+miniprogram/
 proxy/
 tools/
 docs/
 .github/
+site/
 
 # Top-level docs/files
 *.md

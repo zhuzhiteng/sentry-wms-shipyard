@@ -87,18 +87,18 @@ textarea {
 .subtitle {
   margin-top: 8rpx;
   color: #68788a;
-  font-size: 24rpx;
+  font-size: 25rpx;
   line-height: 1.55;
 }
 
 .muted {
-  color: #7b8a99;
-  font-size: 24rpx;
+  color: #5f7080;
+  font-size: 25rpx;
 }
 
 .label {
-  color: #7b8a99;
-  font-size: 22rpx;
+  color: #5f7080;
+  font-size: 24rpx;
 }
 
 .value {
@@ -122,8 +122,8 @@ textarea {
 .chip {
   display: inline-flex;
   align-items: center;
-  min-height: 42rpx;
-  padding: 4rpx 14rpx;
+  min-height: 48rpx;
+  padding: 5rpx 16rpx;
   border-radius: 999rpx;
   color: #365266;
   background: #eaf0f4;
@@ -148,7 +148,7 @@ textarea {
 .button-primary,
 .button-secondary,
 .button-danger {
-  min-height: 86rpx;
+  min-height: 92rpx;
   margin-top: 20rpx;
   border-radius: 16rpx;
   font-size: 28rpx;
@@ -190,6 +190,7 @@ textarea {
 .input,
 .textarea {
   width: 100%;
+  min-height: 88rpx;
   margin-top: 10rpx;
   padding: 20rpx 22rpx;
   border: 1rpx solid #d6dfe6;
@@ -209,7 +210,7 @@ textarea {
 
 .empty {
   padding: 64rpx 24rpx;
-  color: #7b8a99;
+  color: #5f7080;
   text-align: center;
 }
 

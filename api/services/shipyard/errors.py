@@ -136,3 +136,27 @@ class OcrProviderError(ShipyardServiceError):
 
 class LabelRecognitionNotFoundError(ShipyardNotFoundError):
     code = "label_recognition_not_found"
+
+
+class PickupRequestNotFoundError(ShipyardNotFoundError):
+    code = "pickup_request_not_found"
+
+
+class PickupRequestStateError(ShipyardStateError):
+    code = "pickup_request_state_conflict"
+
+
+class DuplicatePickupRequestFileError(ShipyardConflictError):
+    code = "duplicate_pickup_request_file"
+
+
+class PickupLineNotFoundError(ShipyardNotFoundError):
+    code = "pickup_line_not_found"
+
+
+class PickupLineStateError(ShipyardStateError):
+    code = "pickup_line_state_conflict"
+
+
+class ArrivalSlipValidationError(ShipyardValidationError):
+    code = "arrival_slip_validation_failed"

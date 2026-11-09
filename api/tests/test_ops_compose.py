@@ -37,6 +37,7 @@ def test_production_forwards_required_secrets_and_loopback_bindings():
         "SENTRY_PUBSUB_HMAC_KEY",
         "REDIS_URL",
         "SHIPYARD_OCR_PROVIDER",
+        "SHIPYARD_OCR_FALLBACK_PROVIDER",
     ):
         assert key in api_env
     assert prod["services"]["api"]["ports"] == [

@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
-
+import scripts.shipyard_ocr_acceptance as acceptance
 from scripts.shipyard_ocr_acceptance import (
     AcceptanceConfigError,
     evaluate_dataset,
@@ -56,6 +56,7 @@ def test_acceptance_report_counts_normalized_field_hits(tmp_path):
 
     report = evaluate_dataset(
         dataset,
+        provider="baidu",
         recognizer=lambda _content: _result(
             material_code="mat001",
             item_name="船用支架",
@@ -68,6 +69,8 @@ def test_acceptance_report_counts_normalized_field_hits(tmp_path):
     assert report["gate"] == "PASS"
     assert report["summary"]["image_pass_rate"] == 1.0
     assert report["summary"]["field_accuracy"] == 1.0
+    assert report["provider"] == "baidu"
+    assert report["providers_observed"] == ["baidu"]
     assert report["samples"][0]["passed"] is True
 
 
@@ -172,8 +175,48 @@ def test_cli_refuses_real_run_without_credentials(tmp_path, monkeypatch, capsys)
     monkeypatch.delenv("BAIDU_OCR_API_KEY", raising=False)
     monkeypatch.delenv("BAIDU_OCR_SECRET_KEY", raising=False)
 
-    exit_code = main(["--input-dir", str(tmp_path)])
+    exit_code = main(["--input-dir", str(tmp_path), "--provider", "baidu"])
 
     captured = capsys.readouterr()
     assert exit_code == 2
     assert "缺少真实 OCR 凭据" in captured.err
+
+
+def test_rapidocr_acceptance_does_not_require_baidu_credentials():
+    acceptance.require_ocr_configuration("rapidocr", environ={})
+
+
+def test_cli_runs_rapidocr_without_baidu_credentials(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    _dataset(tmp_path)
+    monkeypatch.delenv("BAIDU_OCR_API_KEY", raising=False)
+    monkeypatch.delenv("BAIDU_OCR_SECRET_KEY", raising=False)
+    output_dir = tmp_path / "reports"
+    monkeypatch.setattr(
+        acceptance,
+        "recognize_label_image",
+        lambda _content, **_kwargs: _result(
+            material_code="MAT001",
+            item_name="船用支架",
+            item_spec="S-100",
+            tag_suffix="1-1",
+            label_quantity="4",
+        ),
+    )
+
+    exit_code = main(
+        [
+            "--input-dir",
+            str(tmp_path),
+            "--provider",
+            "rapidocr",
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+
+    assert exit_code == 0
+    assert "OCR 验收 PASS" in capsys.readouterr().out

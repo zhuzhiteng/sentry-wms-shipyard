@@ -68,7 +68,7 @@ Page({
       });
       const orders = (data.orders || []).map((item) => ({
         ...item,
-        status_label: STATUS_LABELS[item.status] || item.status,
+        status_label: STATUS_LABELS[item.status] || '状态待确认',
         status_class: statusClass(item.status),
         progress_text: `${numberText(item.total_fulfilled_quantity)} / ${numberText(item.total_required_quantity)}`,
       }));
@@ -99,7 +99,7 @@ Page({
       });
       const tasks = (data.tasks || []).map((task) => ({
         ...task,
-        status_label: STATUS_LABELS[task.status] || task.status,
+        status_label: STATUS_LABELS[task.status] || '状态待确认',
         status_class: statusClass(task.status),
         suffix_text: (task.expected_tag_suffixes || []).join('、'),
         can_outbound: task.status === 'PENDING',
@@ -198,7 +198,7 @@ Page({
               ...data,
               tasks: data.tasks.map((task) => ({
                 ...task,
-                status_label: STATUS_LABELS[task.status] || task.status,
+                status_label: STATUS_LABELS[task.status] || '状态待确认',
                 status_class: statusClass(task.status),
                 suffix_text: (task.expected_tag_suffixes || []).join('、'),
                 can_outbound: task.status === 'PENDING',
@@ -214,7 +214,7 @@ Page({
             this.setData({ loadingUncertain: true });
             wx.showModal({
               title: '装车结果未确认',
-              content: '网络中断或服务暂不可用，装车可能已经完成。请再次点击确认装车，系统会复用同一提交编号。',
+              content: '网络中断或系统暂时不可用，装车可能已经完成。请再次确认装车，系统不会重复记录。',
               showCancel: false,
             });
           } else if (error.statusCode === 409) {
@@ -223,7 +223,7 @@ Page({
             await this.loadOrders();
             wx.showModal({
               title: '状态已更新',
-              content: '出库单状态已经变化，已刷新最新装车信息。',
+              content: '出库单内容已经变化，已刷新最新装车信息。',
               showCancel: false,
             });
           } else {

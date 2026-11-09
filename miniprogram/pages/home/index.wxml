@@ -29,23 +29,23 @@
   <view class="section-title">现场作业</view>
   <view class="work-grid">
     <view class="work-card receive-card" bindtap="openReceive">
-      <view class="work-kicker">INBOUND</view>
-      <view class="work-title">收货任务</view>
-      <view class="work-desc">到货清单、逐托拍照识别与实收入库</view>
+      <view class="work-kicker">到货</view>
+      <view class="work-title">收货</view>
+      <view class="work-desc">核对到货清单，拍托盘吊牌，确认收货</view>
       <view class="work-arrow">→</view>
     </view>
     <view class="work-card outbound-card" bindtap="openOutbound">
-      <view class="work-kicker">OUTBOUND</view>
+      <view class="work-kicker">出库</view>
       <view class="work-title">出库与装车</view>
-      <view class="work-desc">整票多吊牌核验、库存扣减与整单装车</view>
+      <view class="work-desc">按出库单拍齐托盘吊牌，确认出库和装车</view>
       <view class="work-arrow">→</view>
     </view>
   </view>
 
   <view class="card info-card">
-    <view class="title">操作边界</view>
+    <view class="title">账号记录</view>
     <view class="subtitle">
-      收货人、出库人和装车人自动取当前登录账号；区域、票货数量和仓库权限均由服务端校验。
+      收货人、出库人和装车人自动记录当前账号；存放区域和数量由系统自动核对。
     </view>
   </view>
 </view>

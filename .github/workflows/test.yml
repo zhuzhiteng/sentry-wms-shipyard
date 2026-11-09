@@ -50,12 +50,39 @@ jobs:
       - name: Run mini-program tests
         run: node --test miniprogram/tests/*.test.js
 
+      - name: Run release preflight tests
+        run: node --test tools/shipyard/*.test.mjs
+
       - name: Validate operations Compose overlay
         run: >-
           docker compose --env-file .env.example
           -f docker-compose.yml
           -f docker-compose.ops.yml
           config --quiet
+
+      - name: Validate production Compose and bootstrap mounts
+        run: |
+          docker compose \
+            --env-file deploy/shipyard-production.env.example \
+            -f docker-compose.prod.yml \
+            -f docker-compose.ops.yml \
+            config --quiet
+          docker compose \
+            --env-file deploy/shipyard-production.env.example \
+            -f docker-compose.prod.yml \
+            -f docker-compose.ops.yml \
+            -f docker-compose.prelaunch.yml \
+            config --quiet
+          rendered="$(
+            docker compose \
+              --env-file deploy/shipyard-production.env.example \
+              -f docker-compose.prod.yml \
+              -f docker-compose.ops.yml \
+              config
+          )"
+          printf '%s\n' "$rendered" | grep -q 'docker-entrypoint-initdb.d/01-schema.sql'
+          printf '%s\n' "$rendered" | grep -q 'docker-entrypoint-initdb.d/02-minimal-seed.sh'
+          printf '%s\n' "$rendered" | grep -q 'verify-shipyard-go-live.sql'
 
       - name: Build PostgreSQL 16-compatible backup image
         run: |

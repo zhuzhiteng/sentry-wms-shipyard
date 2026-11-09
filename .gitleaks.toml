@@ -35,4 +35,9 @@ regexes = [
   # signature verification, in .github/workflows/test.yml and
   # api/tests/test_webhook_dispatcher_pubsub_signing.py.
   '''0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef''',
+  # Production environment template placeholder committed before the values
+  # were changed to empty required fields. Exact historical value only.
+  '''REPLACE_WITH_64_HEX_CHARACTERS''',
+  # Deterministic test-only idempotency key used by the pickup outbound test.
+  '''pickup-outbound-test-001''',
 ]

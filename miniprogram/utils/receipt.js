@@ -31,7 +31,7 @@ function validateReceiptDraft({
   differenceReason,
 }) {
   if (!ticket) return { ok: false, error: '请先选择收货任务' };
-  if (!scans?.length) return { ok: false, error: '请先拍摄并识别吊牌' };
+  if (!scans?.length) return { ok: false, error: '请先拍摄吊牌' };
 
   const remaining = remainingQuantity(ticket);
   const receivedNow = toNumber(quantity);

@@ -1,0 +1,40 @@
+# Local production-shape rehearsal overlay. It intentionally uses unique
+# container names and loopback ports so it cannot collide with a normal local
+# stack. This file is not a production deployment target.
+#
+#   docker compose -p shipyard-prelaunch \
+#     --env-file D:\secure\prelaunch.env \
+#     -f docker-compose.prod.yml \
+#     -f docker-compose.ops.yml \
+#     -f docker-compose.prelaunch.yml \
+#     up -d --build
+
+services:
+  db:
+    container_name: sentry-prelaunch-db
+    ports: !reset []
+
+  api:
+    container_name: sentry-prelaunch-api
+    ports: !override
+      - "127.0.0.1:5052:5000"
+
+  redis:
+    container_name: sentry-prelaunch-redis
+
+  celery-worker:
+    container_name: sentry-prelaunch-celery
+
+  admin:
+    container_name: sentry-prelaunch-admin
+    ports: !override
+      - "127.0.0.1:8082:8080"
+
+  ops-init:
+    container_name: sentry-prelaunch-ops-init
+
+  ops-monitor:
+    container_name: sentry-prelaunch-ops-monitor
+
+  ops-backup:
+    container_name: sentry-prelaunch-ops-backup

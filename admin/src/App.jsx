@@ -44,6 +44,7 @@ import TransferOrders from './pages/TransferOrders.jsx';
 import POSActivity from './pages/POSActivity.jsx';
 import Fraud from './pages/Fraud.jsx';
 import ShipyardOutbound from './pages/ShipyardOutbound.jsx';
+import ShipyardPickup from './pages/ShipyardPickup.jsx';
 import ShipyardSettings from './pages/ShipyardSettings.jsx';
 
 function ProtectedRoute({ children }) {
@@ -106,6 +107,7 @@ export default function App() {
         <Route path="/pos-activity" element={<ErrorBoundary fallbackMessage="Could not load POS activity."><POSActivity /></ErrorBoundary>} />
         <Route path="/fraud" element={<ErrorBoundary fallbackMessage="Could not load fraud queue."><Fraud /></ErrorBoundary>} />
         <Route path="/shipyard-outbound" element={<ErrorBoundary fallbackMessage="Could not load shipyard outbound documents."><ShipyardOutbound /></ErrorBoundary>} />
+        <Route path="/shipyard-pickup" element={<ErrorBoundary fallbackMessage="Could not load shipyard pickup demands."><ShipyardPickup /></ErrorBoundary>} />
         <Route path="/shipyard-settings" element={<ErrorBoundary fallbackMessage="Could not load shipyard settings."><ShipyardSettings /></ErrorBoundary>} />
         <Route path="/backorders" element={<ErrorBoundary fallbackMessage="Could not load backorders."><Backorders /></ErrorBoundary>} />
         <Route path="/returns" element={<ErrorBoundary fallbackMessage="Could not load returns."><Returns /></ErrorBoundary>}>

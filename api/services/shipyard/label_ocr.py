@@ -1,8 +1,10 @@
-"""Public-cloud OCR and deterministic parsing for shipyard pallet labels."""
+"""Local-first OCR with optional cloud fallback for shipyard labels."""
 
 from __future__ import annotations
 
 import base64
+import logging
+import math
 import os
 import re
 import threading
@@ -17,8 +19,14 @@ from services.shipyard.errors import OcrProviderError, OcrUnavailableError
 BAIDU_OAUTH_URL = "https://aip.baidubce.com/oauth/2.0/token"
 BAIDU_OCR_URL = "https://aip.baidubce.com/rest/2.0/ocr/v1/accurate_basic"
 
+DEFAULT_PROVIDER = "rapidocr"
+SUPPORTED_PROVIDERS = frozenset({"rapidocr", "baidu"})
+
 _TOKEN_LOCK = threading.Lock()
 _TOKEN_CACHE: dict[str, tuple[str, float]] = {}
+_RAPIDOCR_LOCK = threading.Lock()
+_RAPIDOCR_ENGINE = None
+_LOGGER = logging.getLogger(__name__)
 
 _FIELD_ALIASES = {
     "船号": "ship_no",
@@ -156,8 +164,13 @@ def parse_label_text(raw_text: str) -> dict[str, Any]:
     return fields
 
 
-def _provider() -> str:
-    return (os.getenv("SHIPYARD_OCR_PROVIDER") or "baidu").strip().casefold()
+def _provider(value: str | None = None) -> str:
+    configured = value if value is not None else os.getenv("SHIPYARD_OCR_PROVIDER")
+    return (configured or DEFAULT_PROVIDER).strip().casefold()
+
+
+def _fallback_provider() -> str:
+    return (os.getenv("SHIPYARD_OCR_FALLBACK_PROVIDER") or "").strip().casefold()
 
 
 def _baidu_access_token(*, force_refresh: bool = False) -> str:
@@ -255,18 +268,163 @@ def _baidu_recognize(content: bytes) -> tuple[str, list[str], float | None]:
     return "\n".join(lines), lines, confidence
 
 
-def recognize_label_image(content: bytes) -> LabelOcrResult:
-    provider = _provider()
-    if provider != "baidu":
+def _rapidocr_recognize(content: bytes) -> tuple[str, list[str], float | None]:
+    global _RAPIDOCR_ENGINE
+
+    # RapidOCR's ONNX pipeline is fast after warm-up but is not documented as
+    # thread-safe. One lock per API process also prevents duplicate model loads
+    # under concurrent uploads.
+    with _RAPIDOCR_LOCK:
+        if _RAPIDOCR_ENGINE is None:
+            try:
+                from rapidocr import RapidOCR
+            except (ImportError, OSError) as exc:
+                raise OcrUnavailableError(
+                    "本地 OCR 引擎不可用",
+                    {
+                        "provider": "rapidocr",
+                        "required_packages": ["rapidocr", "onnxruntime"],
+                    },
+                ) from exc
+            try:
+                _RAPIDOCR_ENGINE = RapidOCR()
+            except Exception as exc:
+                raise OcrUnavailableError(
+                    "本地 OCR 引擎初始化失败",
+                    {
+                        "provider": "rapidocr",
+                        "reason": type(exc).__name__,
+                    },
+                ) from exc
+
+        try:
+            result = _RAPIDOCR_ENGINE(content)
+        except Exception as exc:
+            raise OcrProviderError(
+                "本地 OCR 识别失败",
+                {
+                    "provider": "rapidocr",
+                    "reason": type(exc).__name__,
+                },
+            ) from exc
+
+    texts = list(getattr(result, "txts", None) or [])
+    scores = list(getattr(result, "scores", None) or [])
+    lines = []
+    probabilities = []
+    for index, text in enumerate(texts):
+        value = str(text or "").strip()
+        if not value:
+            continue
+        lines.append(value)
+        if index >= len(scores) or scores[index] is None:
+            continue
+        try:
+            score = float(scores[index])
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(score):
+            probabilities.append(score)
+    confidence = (
+        round(sum(probabilities) / len(probabilities), 4) if probabilities else None
+    )
+    return "\n".join(lines), lines, confidence
+
+
+def _recognize_with_provider(
+    provider: str,
+    content: bytes,
+) -> LabelOcrResult:
+    if provider not in SUPPORTED_PROVIDERS:
         raise OcrUnavailableError(
             "不支持的吊牌 OCR 服务",
             {"provider": provider},
         )
-    raw_text, raw_lines, confidence = _baidu_recognize(content)
+    recognizer = {
+        "rapidocr": _rapidocr_recognize,
+        "baidu": _baidu_recognize,
+    }[provider]
+    raw_text, raw_lines, confidence = recognizer(content)
     return LabelOcrResult(
-        provider="baidu",
+        provider=provider,
         raw_text=raw_text,
         raw_lines=raw_lines,
         fields=parse_label_text(raw_text),
         confidence=confidence,
     )
+
+
+def recognize_label_image(
+    content: bytes,
+    *,
+    provider: str | None = None,
+    allow_fallback: bool = True,
+) -> LabelOcrResult:
+    """Recognize one label, using cloud OCR only when explicitly configured.
+
+    Fallback is limited to provider failures and empty primary results. Parsed
+    field completeness remains a business validation concern because the same
+    entry point also serves non-pallet four-part acceptance documents.
+    """
+
+    primary = _provider(provider)
+    if primary not in SUPPORTED_PROVIDERS:
+        raise OcrUnavailableError(
+            "不支持的吊牌 OCR 服务",
+            {"provider": primary},
+        )
+
+    fallback = _fallback_provider() if allow_fallback else ""
+    if fallback and fallback not in SUPPORTED_PROVIDERS:
+        _LOGGER.warning(
+            "shipyard_ocr_fallback_ignored primary=%s reason=unsupported_provider",
+            primary,
+        )
+        fallback = ""
+    if fallback == primary:
+        _LOGGER.warning(
+            "shipyard_ocr_fallback_ignored primary=%s reason=same_provider",
+            primary,
+        )
+        fallback = ""
+
+    try:
+        primary_result = _recognize_with_provider(primary, content)
+        primary_error = None
+    except (OcrUnavailableError, OcrProviderError) as exc:
+        primary_result = None
+        primary_error = exc
+
+    if primary_result is not None and (primary_result.raw_text.strip() or not fallback):
+        return primary_result
+
+    if not fallback:
+        if primary_error is not None:
+            raise primary_error
+        return primary_result
+
+    fallback_reason = "provider_error" if primary_error is not None else "empty_result"
+    try:
+        fallback_result = _recognize_with_provider(fallback, content)
+    except (OcrUnavailableError, OcrProviderError) as exc:
+        _LOGGER.warning(
+            "shipyard_ocr_fallback_failed primary=%s fallback=%s reason=%s "
+            "fallback_error=%s",
+            primary,
+            fallback,
+            fallback_reason,
+            type(exc).__name__,
+        )
+        if primary_error is not None:
+            raise primary_error
+        # The primary engine completed correctly but found no text. A failed
+        # optional fallback must not turn that usable result into an outage.
+        return primary_result
+
+    _LOGGER.warning(
+        "shipyard_ocr_fallback_used primary=%s fallback=%s reason=%s",
+        primary,
+        fallback,
+        fallback_reason,
+    )
+    return fallback_result

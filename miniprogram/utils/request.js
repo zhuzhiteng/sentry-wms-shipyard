@@ -8,7 +8,7 @@ const FIELD_LABELS = {
   material_code: '物料编码',
   item_name: '品名',
   item_spec: '规格',
-  tag_suffix: '托盘后缀',
+  tag_suffix: '托盘编号',
   ship_no: '船号',
   engineering_no: '工程号',
   production_drawing_no: '制作图号',
@@ -23,7 +23,7 @@ function detailMessage(payload) {
       .slice(0, 3)
       .map((detail) => {
         const field = detail.loc?.[0];
-        const label = FIELD_LABELS[field] || field || '字段';
+        const label = FIELD_LABELS[field] || '资料';
         const reason = (
           detail.type === 'missing'
           || /field required/i.test(detail.msg || '')
@@ -38,11 +38,11 @@ function detailMessage(payload) {
     return payload.mismatches
       .slice(0, 3)
       .map((item) => {
-        const label = FIELD_LABELS[item.field] || item.field || '吊牌字段';
+        const label = FIELD_LABELS[item.field] || '吊牌内容';
         if (item.reason === 'REQUIRED') {
-          return `${label}未识别`;
+          return `${label}没读出来`;
         }
-        return `${label}不一致（应为 ${item.expected || '—'}，识别为 ${item.actual || '—'}）`;
+        return `${label}不一致（应为 ${item.expected || '—'}，照片上是 ${item.actual || '—'}）`;
       })
       .join('；');
   }
@@ -56,7 +56,6 @@ function errorMessage(payload, fallback) {
     return details ? `${payload.message}：${details}` : payload.message;
   }
   if (details) return details;
-  if (payload.error) return payload.error;
   return fallback;
 }
 
@@ -96,7 +95,7 @@ function request(options) {
         if (response.statusCode < 200 || response.statusCode >= 300) {
           reject(requestError(
             response.data,
-            `请求失败 (${response.statusCode})`,
+            '操作没有完成，请稍后重试',
             response.statusCode,
           ));
           return;
@@ -104,7 +103,7 @@ function request(options) {
         resolve(response.data);
       },
       fail(error) {
-        const requestError = new Error(error.errMsg || '网络连接失败');
+        const requestError = new Error('网络连接不稳定，请稍后重试');
         requestError.statusCode = 0;
         requestError.networkError = true;
         reject(requestError);
@@ -141,7 +140,7 @@ function upload(options) {
         if (response.statusCode < 200 || response.statusCode >= 300) {
           reject(requestError(
             data,
-            `上传失败 (${response.statusCode})`,
+            '照片上传失败，请重试',
             response.statusCode,
           ));
           return;
@@ -149,7 +148,7 @@ function upload(options) {
         resolve(data);
       },
       fail(error) {
-        const uploadError = new Error(error.errMsg || '照片上传失败');
+        const uploadError = new Error('照片上传失败，请检查网络后重试');
         uploadError.statusCode = 0;
         uploadError.networkError = true;
         reject(uploadError);

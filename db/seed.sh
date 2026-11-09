@@ -78,8 +78,7 @@ else
   echo "================================================="
   echo "  SENTRY WMS INITIAL SETUP COMPLETE"
   echo "  Admin username: admin"
-  echo "  Admin password: $ADMIN_PW"
-  echo "  >>> CHANGE THIS PASSWORD AFTER FIRST LOGIN <<<"
+  echo "  Admin password: supplied through ADMIN_PASSWORD"
   echo "================================================="
 fi
 echo ""

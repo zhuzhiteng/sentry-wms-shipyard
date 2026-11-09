@@ -58,9 +58,11 @@ services:
       # applies the bind at the host level.
       API_BIND_HOST: ${API_BIND_HOST:-127.0.0.1}
       CORS_ORIGINS: "http://localhost:3000,http://localhost:5000,http://localhost:8080"
-      # Shipyard label photos are sent to the configured public OCR
-      # provider. Keep credentials in .env and never in source control.
-      SHIPYARD_OCR_PROVIDER: ${SHIPYARD_OCR_PROVIDER:-baidu}
+      # Shipyard OCR runs locally by default. Configure a cloud fallback only
+      # when its privacy and per-call cost have been approved. Keep credentials
+      # in .env and never in source control.
+      SHIPYARD_OCR_PROVIDER: ${SHIPYARD_OCR_PROVIDER:-rapidocr}
+      SHIPYARD_OCR_FALLBACK_PROVIDER: ${SHIPYARD_OCR_FALLBACK_PROVIDER:-}
       BAIDU_OCR_API_KEY: ${BAIDU_OCR_API_KEY:-}
       BAIDU_OCR_SECRET_KEY: ${BAIDU_OCR_SECRET_KEY:-}
       SHIPYARD_OCR_REQUIRED_FIELDS: ${SHIPYARD_OCR_REQUIRED_FIELDS:-material_code,item_name,tag_suffix}

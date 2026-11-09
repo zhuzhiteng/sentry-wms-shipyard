@@ -72,7 +72,7 @@ Page({
       const task = (data.tasks || []).find(
         (item) => item.task_id === this.data.taskId,
       );
-      if (!task) throw new Error('出库任务不存在');
+      if (!task) throw new Error('没有找到这批出库货物');
       const draft = this.pendingDraft;
       this.pendingDraft = null;
       const hadDraft = Boolean(draft && draft.task_id === task.task_id);
@@ -208,7 +208,7 @@ Page({
     const pendingCapture = this.data.pendingCapture;
     if (!suffix || !pendingCapture) return;
     if (!(this.data.task.expected_tag_suffixes || []).includes(suffix)) {
-      wx.showToast({ title: '该托盘不属于当前整票', icon: 'none' });
+      wx.showToast({ title: '这个托盘不属于当前货物', icon: 'none' });
       return;
     }
     if (this.data.scans.some((item) => item.suffix === suffix)) {
@@ -232,7 +232,7 @@ Page({
     this.skipDraftPersist = false;
     this.submissionPending = false;
     this.persistDraft();
-    wx.showToast({ title: '照片已留证，本次未计入核销', icon: 'none' });
+    wx.showToast({ title: '照片已保存，这次没有算出库', icon: 'none' });
   },
 
   addCapture(result, suffix) {
@@ -260,7 +260,7 @@ Page({
     this.skipDraftPersist = false;
     this.submissionPending = false;
     this.persistDraft();
-    wx.showToast({ title: `托盘 ${suffix} 识别通过`, icon: 'success' });
+    wx.showToast({ title: `托盘 ${suffix} 核对通过`, icon: 'success' });
   },
 
   showLabelError(result, mismatches = [], fallback = '') {
@@ -273,9 +273,11 @@ Page({
       };
       if (candidates.length === 1) {
         wx.showModal({
-          title: '吊牌属于另一票货物',
-          content: `照片内容对应任务 ${candidates[0].task_no}。当前任务不能继续核销。`,
-          confirmText: '去正确任务',
+          title: '拍到了另一批货',
+          content: candidates[0].task_no
+            ? `这张吊牌对应出库单 ${candidates[0].task_no}，当前页面不能继续。`
+            : '这张吊牌对应另一张出库单，当前页面不能继续。',
+          confirmText: '去正确出库单',
           cancelText: '留在当前票',
           success: (choice) => {
             if (choice.confirm) goToCandidate(candidates[0]);
@@ -302,21 +304,23 @@ Page({
       item_name: '品名',
       item_spec: '规格',
       label_quantity: '件数',
-      tag_suffix: '托盘后缀',
+      tag_suffix: '托盘编号',
     };
     const details = mismatches.slice(0, 4).map((item) => {
       const label = labels[item.field] || item.field;
-      if (item.reason === 'REQUIRED') return `${label}未识别`;
-      return `${label}不一致，应为 ${item.expected || '—'}，识别为 ${item.actual || '—'}`;
+      if (item.reason === 'REQUIRED') return `${label}没读出来`;
+      return `${label}不一致，应为 ${item.expected || '—'}，照片上是 ${item.actual || '—'}`;
     }).join('\n');
     if (result.mismatches?.length && !mismatches.length) {
       return this.showLabelError(result, result.mismatches, fallback);
     }
     if (result.matched_task_id && result.matched_outbound_order_id) {
       wx.showModal({
-        title: '吊牌属于另一票货物',
-        content: `该吊牌对应任务 ${result.matched_task_no || result.matched_task_id}。当前任务不能继续核销。`,
-        confirmText: '去正确任务',
+        title: '拍到了另一批货',
+        content: result.matched_task_no
+          ? `这张吊牌对应出库单 ${result.matched_task_no}，当前页面不能继续。`
+          : '这张吊牌对应另一张出库单，当前页面不能继续。',
+        confirmText: '去正确出库单',
         cancelText: '留在当前票',
         success: (choice) => {
           if (!choice.confirm) return;
@@ -329,7 +333,7 @@ Page({
     }
     wx.showModal({
       title: '吊牌未通过',
-      content: `${details || fallback || '请调整角度后重拍'}\n\n照片已留证，本次未计入核销。`,
+      content: `${details || fallback || '请调整角度后重拍'}\n\n照片已保存，这次没有算出库。`,
       showCancel: false,
       confirmText: '重拍',
     });
@@ -380,7 +384,7 @@ Page({
     const expected = task.expected_tag_suffixes || [];
     if (scans.length !== expected.length) {
       wx.showToast({
-        title: `整票未齐套，还缺 ${expected.length - scans.length} 托`,
+        title: `托盘还没拍齐，还缺 ${expected.length - scans.length} 托`,
         icon: 'none',
       });
       return;
@@ -413,8 +417,8 @@ Page({
       clearDraft(this.draftScope);
       clearSubmissionKey(submissionScope);
       wx.showModal({
-        title: '整票出库完成',
-        content: `扣减 ${result.confirmation.quantity} 件\n区域 ${result.confirmation.location_path_snapshot}\n出库单状态 ${result.order.status}`,
+        title: '这批货已出库',
+        content: `数量 ${result.confirmation.quantity} 件\n存放区域 ${result.confirmation.location_path_snapshot}`,
         showCancel: false,
         success: () => wx.navigateBack(),
       });
@@ -426,7 +430,7 @@ Page({
         this.persistDraft();
         wx.showModal({
           title: '提交结果未确认',
-          content: '网络中断或服务暂不可用，整票可能已经扣库。请重试上次提交，系统不会重复扣库。',
+          content: '网络中断或系统暂时不可用，这批货可能已经出库。请再次确认出库，系统不会重复扣库。',
           showCancel: false,
           confirmText: '知道了',
         });
@@ -439,7 +443,7 @@ Page({
         await this.loadTask();
         wx.showModal({
           title: '状态已更新',
-          content: '该整票状态已经变化，已刷新最新出库信息。',
+          content: '货物状态已经变化，已刷新最新出库信息。',
           showCancel: false,
         });
       } else {

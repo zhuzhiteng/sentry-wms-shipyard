@@ -1,5 +1,6 @@
 """Request schemas for the shipyard warehouse domain."""
 
+from datetime import date
 from decimal import Decimal
 from typing import Literal
 from uuid import UUID
@@ -240,3 +241,113 @@ class ConfirmOutboundLoadingRequest(BaseModel):
     @classmethod
     def strip_loading_optional(cls, value: str | None) -> str | None:
         return _strip_text(value) or None
+
+
+class DeferInboundBatchRequest(BaseModel):
+    next_batch_date: date
+    reason: str = Field(..., min_length=1, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def strip_defer_reason(cls, value: str) -> str:
+        return _strip_required_text(value)
+
+
+class UpdateArrivalSlipRequest(BaseModel):
+    slip_no: str = Field(..., min_length=1, max_length=128)
+    delivery_note_no: str = Field(..., min_length=1, max_length=128)
+    supplier_name: str = Field(..., min_length=1, max_length=200)
+    engineering_no: str | None = Field(None, max_length=64)
+    purchase_order_no: str | None = Field(None, max_length=128)
+
+    @field_validator("slip_no", "delivery_note_no", "supplier_name")
+    @classmethod
+    def strip_required_arrival_fields(cls, value: str) -> str:
+        return _strip_required_text(value)
+
+    @field_validator("engineering_no", "purchase_order_no")
+    @classmethod
+    def strip_optional_arrival_fields(cls, value: str | None) -> str | None:
+        return _strip_text(value) or None
+
+
+class SpecialPickupLineRequest(BaseModel):
+    line_no: str = Field(..., min_length=1, max_length=32)
+    engineering_no: str = Field(..., min_length=1, max_length=64)
+    section_no: str | None = Field(None, max_length=64)
+    pallet_no: str = Field(..., min_length=1, max_length=128)
+    pallet_name: str = Field(..., min_length=1, max_length=255)
+    material_code: str | None = Field(None, max_length=128)
+    material_name: str | None = Field(None, max_length=255)
+    item_spec: str | None = Field(None, max_length=2000)
+    quantity: Decimal = Field(
+        ...,
+        gt=0,
+        max_digits=18,
+        decimal_places=3,
+    )
+    unit: str = Field(default="件", min_length=1, max_length=32)
+    expected_arrival_date: date | None = None
+    keeper_name: str | None = Field(None, max_length=100)
+    keeper_phone: str | None = Field(None, max_length=50)
+    delivery_address: str | None = Field(None, max_length=255)
+    remarks: str | None = Field(None, max_length=500)
+
+    @field_validator(
+        "line_no",
+        "engineering_no",
+        "pallet_no",
+        "pallet_name",
+        "unit",
+    )
+    @classmethod
+    def strip_required_special_fields(cls, value: str) -> str:
+        return _strip_required_text(value)
+
+    @field_validator(
+        "section_no",
+        "material_code",
+        "material_name",
+        "item_spec",
+        "keeper_name",
+        "keeper_phone",
+        "delivery_address",
+        "remarks",
+    )
+    @classmethod
+    def strip_optional_special_fields(cls, value: str | None) -> str | None:
+        return _strip_text(value) or None
+
+
+class CreateSpecialPickupRequest(BaseModel):
+    warehouse_id: int = Field(..., gt=0)
+    request_no: str = Field(..., min_length=1, max_length=128)
+    dispatch_no: str = Field(..., min_length=1, max_length=128)
+    request_date: date
+    lines: list[SpecialPickupLineRequest] = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+    )
+
+    @field_validator("request_no", "dispatch_no")
+    @classmethod
+    def strip_special_request_header(cls, value: str) -> str:
+        return _strip_required_text(value)
+
+
+class ConfirmPickupRequest(BaseModel):
+    """Confirmation uses the server-side inventory match."""
+
+
+class GeneratePickupOutboundRequest(BaseModel):
+    line_ids: list[UUID] | None = Field(None, min_length=1, max_length=500)
+
+
+class VoidPickupRequest(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def strip_pickup_void_reason(cls, value: str) -> str:
+        return _strip_required_text(value)

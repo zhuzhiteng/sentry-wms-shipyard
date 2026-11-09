@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -11,8 +10,13 @@ from psycopg2.extras import Json
 from sqlalchemy import text
 
 from constants import (
+    ACTION_SHIPYARD_INBOUND_BATCH_DEFERRED,
     ACTION_SHIPYARD_SHORTAGE_UPDATED,
     ACTION_SHIPYARD_TICKET_RECEIVED,
+    SHIPYARD_DELIVERY_DEFERRED,
+    SHIPYARD_DELIVERY_PARTIAL,
+    SHIPYARD_DELIVERY_PENDING,
+    SHIPYARD_DELIVERY_RECEIVED,
     SHIPYARD_LABEL_RECOGNITION_FAILED,
     SHIPYARD_LABEL_RECOGNITION_MATCHED,
     SHIPYARD_LABEL_RECOGNITION_NEEDS_REVIEW,
@@ -78,7 +82,7 @@ ALLOWED_PHOTO_CONTENT_TYPES = {
 def _iso(value: Any) -> str | None:
     if value is None:
         return None
-    if isinstance(value, datetime):
+    if hasattr(value, "isoformat"):
         return value.isoformat()
     return value
 
@@ -120,7 +124,9 @@ def _ticket_context(db, ticket_id: str, *, for_update: bool = False):
                t.on_hand_quantity, t.expected_pallet_count,
                t.assigned_bin_id, t.location_path_snapshot,
                t.stock_lot_number, t.status, t.shortage_status,
-               t.shortage_note,
+               t.shortage_note, t.delivery_status,
+               t.deferred_to_date, t.deferred_reason,
+               t.deferred_by, t.deferred_at,
                l.line_id, l.source_row_no, l.ship_no,
                l.engineering_no, l.production_drawing_no,
                l.drawing_name, l.manufacturer_name, l.material_code, l.item_name,
@@ -541,6 +547,11 @@ def _ticket_payload(context) -> dict[str, Any]:
         "stock_lot_number": context.stock_lot_number,
         "status": context.status,
         "shortage_status": context.shortage_status,
+        "delivery_status": context.delivery_status,
+        "deferred_to_date": _iso(context.deferred_to_date),
+        "deferred_reason": context.deferred_reason,
+        "deferred_by": context.deferred_by,
+        "deferred_at": _iso(context.deferred_at),
     }
 
 
@@ -1321,6 +1332,11 @@ def confirm_ticket_receipt(
                    on_hand_quantity = :on_hand_quantity,
                    status = :status,
                    shortage_status = :shortage_status,
+                   delivery_status = :delivery_status,
+                   deferred_to_date = NULL,
+                   deferred_reason = NULL,
+                   deferred_by = NULL,
+                   deferred_at = NULL,
                    updated_at = NOW()
              WHERE ticket_id = :ticket_id
             """
@@ -1331,6 +1347,11 @@ def confirm_ticket_receipt(
             "on_hand_quantity": new_on_hand,
             "status": ticket_status,
             "shortage_status": shortage_status,
+            "delivery_status": (
+                SHIPYARD_DELIVERY_RECEIVED
+                if ticket_status == SHIPYARD_TICKET_IN_STOCK
+                else SHIPYARD_DELIVERY_PARTIAL
+            ),
         },
     )
     line_status = (
@@ -1473,3 +1494,110 @@ def report_ticket_shortage(
             "summary": manifest_payload["validation"]["summary"],
         },
     }
+
+
+def defer_ticket_batch(
+    db,
+    *,
+    ticket_id: str,
+    next_batch_date,
+    reason: str,
+    deferred_by: str,
+) -> dict[str, Any]:
+    context = _ticket_context(db, ticket_id, for_update=True)
+    if context is None:
+        raise TicketNotFoundError("票货不存在")
+    _ensure_receivable(context)
+    if context.received_quantity >= context.declared_quantity:
+        raise TicketStateError("票货已经全部到货，不能顺延")
+    db.execute(
+        text(
+            """
+            UPDATE shipyard_cargo_tickets
+               SET delivery_status = :delivery_status,
+                   deferred_to_date = :next_batch_date,
+                   deferred_reason = :reason,
+                   deferred_by = :deferred_by,
+                   deferred_at = NOW(),
+                   updated_at = NOW()
+             WHERE ticket_id = :ticket_id
+            """
+        ),
+        {
+            "ticket_id": ticket_id,
+            "delivery_status": SHIPYARD_DELIVERY_DEFERRED,
+            "next_batch_date": next_batch_date,
+            "reason": reason,
+            "deferred_by": deferred_by,
+        },
+    )
+    write_audit_log(
+        db,
+        action_type=ACTION_SHIPYARD_INBOUND_BATCH_DEFERRED,
+        entity_type="shipyard_cargo_ticket",
+        entity_id=0,
+        user_id=deferred_by,
+        warehouse_id=context.warehouse_id,
+        details={
+            "ticket_id": ticket_id,
+            "ticket_no": context.ticket_no,
+            "manifest_id": str(context.manifest_id),
+            "next_batch_date": str(next_batch_date),
+            "reason": reason,
+        },
+    )
+    db.commit()
+    updated = _ticket_context(db, ticket_id)
+    return {"ticket": _ticket_payload(updated)}
+
+
+def restore_ticket_delivery(
+    db,
+    *,
+    ticket_id: str,
+    restored_by: str,
+) -> dict[str, Any]:
+    context = _ticket_context(db, ticket_id, for_update=True)
+    if context is None:
+        raise TicketNotFoundError("票货不存在")
+    if context.delivery_status != SHIPYARD_DELIVERY_DEFERRED:
+        raise TicketStateError(
+            "只有已顺延的票货可以恢复待收货",
+            {"delivery_status": context.delivery_status},
+        )
+    delivery_status = (
+        SHIPYARD_DELIVERY_PARTIAL
+        if context.received_quantity > 0
+        else SHIPYARD_DELIVERY_PENDING
+    )
+    db.execute(
+        text(
+            """
+            UPDATE shipyard_cargo_tickets
+               SET delivery_status = :delivery_status,
+                   deferred_to_date = NULL,
+                   deferred_reason = NULL,
+                   deferred_by = NULL,
+                   deferred_at = NULL,
+                   updated_at = NOW()
+             WHERE ticket_id = :ticket_id
+            """
+        ),
+        {"ticket_id": ticket_id, "delivery_status": delivery_status},
+    )
+    write_audit_log(
+        db,
+        action_type=ACTION_SHIPYARD_INBOUND_BATCH_DEFERRED,
+        entity_type="shipyard_cargo_ticket",
+        entity_id=0,
+        user_id=restored_by,
+        warehouse_id=context.warehouse_id,
+        details={
+            "ticket_id": ticket_id,
+            "ticket_no": context.ticket_no,
+            "action": "RESTORE",
+        },
+    )
+    db.commit()
+    updated = _ticket_context(db, ticket_id)
+    return {"ticket": _ticket_payload(updated)}

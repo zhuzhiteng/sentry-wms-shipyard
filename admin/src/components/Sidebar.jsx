@@ -31,6 +31,7 @@ const NAV = [
     label: 'Outbound',
     items: [
       { to: '/sales-orders', label: 'Sales Orders', pageKey: 'sales-orders' },
+      { to: '/shipyard-pickup', label: 'Pickup Demand', pageKey: 'shipyard-outbound' },
       { to: '/shipyard-outbound', label: 'Shipyard Outbound', pageKey: 'shipyard-outbound' },
       { to: '/pos-activity', label: 'POS Activity' },
       { to: '/fraud', label: 'Fraud', pageKey: 'fraud' },

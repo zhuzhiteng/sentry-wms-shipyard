@@ -9,12 +9,21 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-sentry}
       SKIP_SEED: "true"
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # A fresh production volume must never start with an empty schema.
+      # Site-specific master data and operator accounts are configured after
+      # bootstrap by an authenticated administrator.
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./db/seed.sh:/docker-entrypoint-initdb.d/02-minimal-seed.sh:ro
+      - ./db/migrations:/migrations:ro
+      - ./db/verify-shipyard-go-live.sql:/seed-data/verify-shipyard-go-live.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sentry}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?Set POSTGRES_USER in .env}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -40,7 +49,8 @@ services:
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379/0
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379/0
       REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379/0
-      SHIPYARD_OCR_PROVIDER: ${SHIPYARD_OCR_PROVIDER:-baidu}
+      SHIPYARD_OCR_PROVIDER: ${SHIPYARD_OCR_PROVIDER:-rapidocr}
+      SHIPYARD_OCR_FALLBACK_PROVIDER: ${SHIPYARD_OCR_FALLBACK_PROVIDER:-}
       BAIDU_OCR_API_KEY: ${BAIDU_OCR_API_KEY:-}
       BAIDU_OCR_SECRET_KEY: ${BAIDU_OCR_SECRET_KEY:-}
       SHIPYARD_OCR_REQUIRED_FIELDS: ${SHIPYARD_OCR_REQUIRED_FIELDS:-material_code,item_name,tag_suffix}

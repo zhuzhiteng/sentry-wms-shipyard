@@ -69,12 +69,12 @@
 
 .remove-button {
   margin: 16rpx 0 0;
-  min-height: 60rpx;
+  min-height: 88rpx;
   color: #856141;
   background: #f8f1e8;
   border-radius: 10rpx;
   font-size: 23rpx;
-  line-height: 60rpx;
+  line-height: 88rpx;
 }
 
 .remove-button::after {

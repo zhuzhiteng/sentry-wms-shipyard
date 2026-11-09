@@ -11,6 +11,10 @@ node_modules/
 
 # Environment
 .env
+.env.*
+!.env.example
+deploy/*.env
+!deploy/*.env.example
 
 # IDE
 .vscode/

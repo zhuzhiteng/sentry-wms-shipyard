@@ -67,7 +67,7 @@ test('marks transport failures as ambiguous writes', async () => {
     (error) => {
       assert.equal(error.networkError, true);
       assert.equal(error.statusCode, 0);
-      assert.match(error.message, /timeout/);
+      assert.match(error.message, /网络连接不稳定/);
       return true;
     },
   );

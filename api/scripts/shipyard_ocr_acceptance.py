@@ -29,6 +29,8 @@ from services.shipyard.errors import (
     OcrUnavailableError,
 )
 from services.shipyard.label_ocr import (
+    DEFAULT_PROVIDER,
+    SUPPORTED_PROVIDERS,
     LabelOcrResult,
     recognize_label_image,
 )
@@ -53,6 +55,7 @@ EXPECTED_FIELDS = {
 }
 OCR_ENV_KEYS = {
     "SHIPYARD_OCR_PROVIDER",
+    "SHIPYARD_OCR_FALLBACK_PROVIDER",
     "BAIDU_OCR_API_KEY",
     "BAIDU_OCR_SECRET_KEY",
     "SHIPYARD_OCR_TOKEN_TIMEOUT_S",
@@ -159,11 +162,21 @@ def load_env_file(path: Path, *, environ=None) -> None:
             environ.setdefault(key, value)
 
 
-def require_ocr_configuration(environ=None) -> None:
+def configured_provider(environ=None) -> str:
     environ = environ if environ is not None else os.environ
-    provider = (environ.get("SHIPYARD_OCR_PROVIDER") or "baidu").strip().casefold()
+    return (environ.get("SHIPYARD_OCR_PROVIDER") or DEFAULT_PROVIDER).strip().casefold()
+
+
+def require_ocr_configuration(provider=None, environ=None) -> None:
+    environ = environ if environ is not None else os.environ
+    provider = (provider or configured_provider(environ)).strip().casefold()
+    if provider not in SUPPORTED_PROVIDERS:
+        supported = ", ".join(sorted(SUPPORTED_PROVIDERS))
+        raise AcceptanceConfigError(
+            f"不支持的 OCR provider: {provider}；可选 {supported}"
+        )
     if provider != "baidu":
-        raise AcceptanceConfigError(f"不支持的 OCR provider: {provider}")
+        return
     missing = [
         key
         for key in ("BAIDU_OCR_API_KEY", "BAIDU_OCR_SECRET_KEY")
@@ -267,6 +280,7 @@ def evaluate_dataset(
     dataset: Dataset,
     *,
     recognizer: Callable[[bytes], LabelOcrResult] | None = None,
+    provider: str = DEFAULT_PROVIDER,
     interval_seconds: float = 0.0,
     minimum_image_pass_rate: float = 1.0,
     minimum_field_accuracy: float = 1.0,
@@ -343,7 +357,10 @@ def evaluate_dataset(
         "report_version": 1,
         "generated_at": _utc_now(),
         "dataset": dataset.name,
-        "provider": (os.getenv("SHIPYARD_OCR_PROVIDER") or "baidu").casefold(),
+        "provider": provider,
+        "providers_observed": sorted(
+            {str(item["provider"]) for item in sample_reports if item["provider"]}
+        ),
         "gate": "PASS" if passed else "FAIL",
         "thresholds": {
             "minimum_image_pass_rate": minimum_image_pass_rate,
@@ -381,7 +398,11 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         f"- 生成时间：{report['generated_at']}",
         f"- 数据集：{report['dataset']}",
-        f"- OCR 服务：{report['provider']}",
+        f"- 验收 OCR 服务：{report['provider']}",
+        (
+            "- 实际返回服务："
+            + (", ".join(report.get("providers_observed") or []) or "无")
+        ),
         f"- 结论：**{report['gate']}**",
         "",
         "## 汇总",
@@ -497,6 +518,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="只读取 OCR 相关键；已有进程环境变量优先",
     )
     parser.add_argument(
+        "--provider",
+        choices=sorted(SUPPORTED_PROVIDERS),
+        help=(
+            "只验收一个 OCR 服务，不启用兜底；"
+            f"默认取 SHIPYARD_OCR_PROVIDER，未设置时用 {DEFAULT_PROVIDER}"
+        ),
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         help="报告目录；默认写回样图目录，建议使用仓库外目录",
@@ -541,13 +570,20 @@ def main(argv=None) -> int:
             return 0
         if args.env_file:
             load_env_file(args.env_file)
-        require_ocr_configuration()
+        provider = (args.provider or configured_provider()).strip().casefold()
+        require_ocr_configuration(provider)
     except AcceptanceConfigError as exc:
         print(f"错误：{exc}", file=sys.stderr)
         return 2
 
     report = evaluate_dataset(
         dataset,
+        recognizer=lambda content: recognize_label_image(
+            content,
+            provider=provider,
+            allow_fallback=False,
+        ),
+        provider=provider,
         interval_seconds=args.interval_seconds,
         minimum_image_pass_rate=args.minimum_image_pass_rate,
         minimum_field_accuracy=args.minimum_field_accuracy,

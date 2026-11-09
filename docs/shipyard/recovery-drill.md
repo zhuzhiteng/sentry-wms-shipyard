@@ -113,6 +113,7 @@ docker exec -e DRILL_DB=$dbPrimary sentry-api sh -c `
 docker exec -e DRILL_DB=$dbPrimary sentry-api sh -c `
   'export DATABASE_URL="${DATABASE_URL%/*}/$DRILL_DB"
    export FLASK_ENV=test
+   export SENTRY_INBOUND_MAPPINGS_DIR=/app/db/mappings
    export SENTRY_ALLOW_HTTP_WEBHOOKS=false
    export SENTRY_ALLOW_INTERNAL_WEBHOOKS=false
    export DISPATCHER_ENABLED=false

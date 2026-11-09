@@ -12,6 +12,8 @@ cryptography==50.0.0
 pydantic==2.11.3
 openpyxl==3.1.5
 requests==2.33.0
+rapidocr==3.10.0
+onnxruntime==1.31.1
 flask-limiter[redis]==3.8.0
 jsonschema==4.23.0
 PyYAML==6.0.2

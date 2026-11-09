@@ -10,7 +10,9 @@ FROM python:3.11-slim
 # future refactor that drops this line will surface as a test
 # failure rather than a silent regression.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends postgresql-client \
+    && apt-get install -y --no-install-recommends \
+        libgomp1 \
+        postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -41,11 +43,15 @@ COPY db/mappings /app/db/mappings
 # leaves stale dependencies -- e.g., flask_limiter missing after v1.3->v1.4).
 RUN grep -oP '(?<=__version__ = ")[^"]+' /app/version.py > /app/BUILD_VERSION
 
-RUN adduser --disabled-password --no-create-home appuser
+RUN adduser --disabled-password --gecos "" appuser
 USER appuser
 
 EXPOSE 5000
 
+# --workers 2: RapidOCR loads one model set per worker. Measured peak use is
+# roughly 0.6-0.8 GB after warm-up under concurrent requests, so four API
+# workers could exceed a small on-premise host before accounting for
+# PostgreSQL, Redis and the sidecars.
 # --timeout 180: gunicorn's default 30s worker timeout cuts off the
 # slowest PO inbound payloads (wide product-line counts) and the
 # largest cycle-count approvals (a single bin can carry 300+ varianced
@@ -53,4 +59,4 @@ EXPOSE 5000
 # write completes. 180s gives the canonical write paths headroom
 # without masking a runaway query. nginx proxy_read/send_timeout must
 # stay above this so the proxy never severs a still-working backend.
-CMD ["gunicorn", "-w", "4", "--timeout", "180", "-b", "0.0.0.0:5000", "app:create_app()"]
+CMD ["gunicorn", "-w", "2", "--timeout", "180", "-b", "0.0.0.0:5000", "app:create_app()"]

@@ -58,6 +58,7 @@ from shipyard.helpers import (
 from app import create_app
 from services.rate_limit import limiter
 from services.shipyard import (
+    inbound_document_service,
     outbound_turnover_service,
     receipt_service,
 )
@@ -574,6 +575,66 @@ def run() -> dict:
             _set_expected_pallet_count(ticket["ticket_id"], 2)
             steps.append("导入并确认到货清单，生成两张托盘任务")
 
+            inbound_document_service.recognize_label_image = lambda _content: (
+                LabelOcrResult(
+                    provider="e2e-stub",
+                    raw_text="",
+                    raw_lines=[
+                        f"验收单号：E2E-{run_id}",
+                        f"送货单号：DN-{run_id}",
+                        "供应商：E2E 测试配件厂",
+                        f"工程号：{ship_no}",
+                        "PO NO：PO-E2E",
+                    ],
+                    fields={},
+                    confidence=0.99,
+                )
+            )
+            arrival_recognition = _json(
+                session.post(
+                    f"{api_base}/shipyard/inbound/manifests/{manifest_id}/"
+                    "arrival-slips/recognize",
+                    files=_label_files("arrival-slip-e2e.png"),
+                    timeout=10,
+                ),
+                200,
+            )
+            if arrival_recognition["fields"]["slip_no"] != f"E2E-{run_id}":
+                raise AssertionError(arrival_recognition)
+            arrival_record = _json(
+                session.post(
+                    f"{api_base}/shipyard/inbound/manifests/{manifest_id}/"
+                    "arrival-slips",
+                    data={
+                        **arrival_recognition["fields"],
+                        "factory_copy_count": "2",
+                        "shipyard_copy_count": "2",
+                        "warehouse_copy_retained": "true",
+                    },
+                    files=_label_files("arrival-slip-e2e.png"),
+                    timeout=10,
+                ),
+                201,
+            )
+            arrival_slip_id = arrival_record["arrival_slip_id"]
+            corrected_arrival = _json(
+                session.put(
+                    f"{api_base}/shipyard/inbound/arrival-slips/{arrival_slip_id}",
+                    json={
+                        **arrival_recognition["fields"],
+                        "slip_no": f"E2E-CORRECTED-{run_id}",
+                    },
+                    timeout=10,
+                ),
+                200,
+            )
+            if (
+                corrected_arrival["arrival_slips"][0]["slip_no"]
+                != f"E2E-CORRECTED-{run_id}"
+            ):
+                raise AssertionError(corrected_arrival)
+            steps.append("四联验收单 OCR、自动留存和字段修正通过")
+
             pallets = []
             receipt_photo_ids = []
             for suffix in suffixes:
@@ -761,6 +822,17 @@ def run() -> dict:
                 role="OUTBOUND",
                 page_keys=["dashboard", "inventory", "shipyard-outbound"],
                 warehouse_ids=[2],
+            )
+            _json(
+                foreign_receiver.put(
+                    f"{api_base}/shipyard/inbound/arrival-slips/{arrival_slip_id}",
+                    json={
+                        **arrival_recognition["fields"],
+                        "slip_no": f"FOREIGN-{run_id}",
+                    },
+                    timeout=10,
+                ),
+                403,
             )
             receiver_without_page = _create_role_session(
                 session,
